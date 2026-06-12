@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ── Game Tuning ───────────────────────────────────────────────────────
-    NIGHT_DURATION: int = 60          # seconds
-    DISCUSSION_DURATION: int = 120
-    VOTING_DURATION: int = 45
+    NIGHT_DURATION: int = 15          # seconds
+    DISCUSSION_DURATION: int = 15
+    VOTING_DURATION: int = 15
     EXECUTION_DURATION: int = 10
 
     MIN_PLAYERS: int = 8

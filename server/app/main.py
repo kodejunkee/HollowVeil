@@ -17,8 +17,8 @@ from pydantic import BaseModel
 
 from .config import get_settings
 from .auth import verify_token
-from .room_registry import create_room, get_room, find_or_create_quick_play
-from .ws.connection_manager import ConnectionManager
+from .room_registry import create_room, get_room, find_or_create_quick_play, get_room_by_code
+from .ws.connection_manager import manager
 from .ws.message_handler import MessageHandler
 
 settings = get_settings()
@@ -38,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-manager = ConnectionManager()
 handler = MessageHandler(manager)
 
 # ── Health Check ──────────────────────────────────────────────────────────────
@@ -110,6 +109,9 @@ class RoomResponse(BaseModel):
 class CreateRoomRequest(BaseModel):
     is_private: bool = False
 
+class JoinRoomRequest(BaseModel):
+    room_code: str
+
 @app.post("/api/rooms/quickplay", response_model=RoomResponse)
 async def api_quickplay(token: str = Query(...)):
     try:
@@ -128,4 +130,26 @@ async def api_create_room(req: CreateRoomRequest, token: str = Query(...)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     room = await create_room(user.user_id)
+    return RoomResponse(room_id=room.room_id, room_code=room.room_code)
+
+@app.post("/api/rooms/join", response_model=RoomResponse)
+async def api_join_room(req: JoinRoomRequest, token: str = Query(...)):
+    with open("join_debug.log", "a") as f:
+        f.write(f"JOIN ATTEMPT: room_code={req.room_code}\n")
+    try:
+        user = verify_token(token)
+    except Exception as e:
+        with open("join_debug.log", "a") as f:
+            f.write(f"TOKEN VERIFY FAILED: {e}\n")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    room = get_room_by_code(req.room_code)
+    if not room:
+        with open("join_debug.log", "a") as f:
+            from .room_registry import _rooms_by_code
+            f.write(f"ROOM NOT FOUND. Current rooms: {list(_rooms_by_code.keys())}\n")
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    with open("join_debug.log", "a") as f:
+        f.write(f"JOIN SUCCESS\n")
     return RoomResponse(room_id=room.room_id, room_code=room.room_code)

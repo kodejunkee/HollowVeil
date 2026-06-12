@@ -51,6 +51,7 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
             continue
         target.is_protected = True
         player.last_protected_target = target_id
+        room.add_timeline_event("Night", f"Warden ({player.display_name}) protected {target.display_name}")
         events.append({
             "event": "warden_protect",
             "recipient": player.user_id,
@@ -67,6 +68,7 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
         if not target:
             continue
         result = get_seer_result(target.role)
+        room.add_timeline_event("Night", f"Seer ({player.display_name}) investigated {target.display_name} and found {result.value.upper()}")
         events.append({
             "event": "seer_result",
             "recipient": player.user_id,
@@ -100,6 +102,7 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
         if not target or not target.is_alive:
             continue
         player.arrows -= 1
+        room.add_timeline_event("Night", f"Hunter ({player.display_name}) shot {target.display_name}")
         room.pending_kills.append({
             "target": target_id,
             "source": "hunter",
@@ -109,6 +112,9 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
     # ── 4. Vampire (shared Coven vote) ────────────────────────────────────
     vampire_target = _resolve_coven_vote(room)
     if vampire_target:
+        t = room.get_player(vampire_target)
+        target_name = t.display_name if t else vampire_target
+        room.add_timeline_event("Night", f"Vampires voted to kill {target_name}")
         room.pending_kills.append({
             "target": vampire_target,
             "source": "vampire",
@@ -123,6 +129,7 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
         target = room.get_player(target_id)
         if not target or not target.is_alive:
             continue
+        room.add_timeline_event("Night", f"Werewolf ({player.display_name}) mauled {target.display_name}")
         room.pending_kills.append({
             "target": target_id,
             "source": "werewolf",
@@ -146,6 +153,7 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
             continue
         target.revive()
         player.has_revived = True
+        room.add_timeline_event("Night", f"Necromancer ({player.display_name}) revived {target.display_name}")
         events.append({
             "event": "necromancer_revive",
             "public": True,
@@ -242,6 +250,7 @@ def _resolve_deaths(
         # ── Cursed Villager transformation on vampire attack ──────────
         if source == "vampire" and target.role == RoleType.CURSED_VILLAGER:
             target.transform_to_werewolf()
+            room.add_timeline_event("Night", f"{target.display_name}'s curse awakened, transforming them into a Werewolf!")
             events.append({
                 "event": "cursed_transform",
                 "recipient": target_id,
@@ -265,6 +274,7 @@ def _resolve_deaths(
 
         # ── Actual death ──────────────────────────────────────────────
         target.kill(room.round_number)
+        room.add_timeline_event("Dawn", f"{target.display_name} was found dead")
         deaths.append({
             "target": target_id,
             "target_name": target.display_name,

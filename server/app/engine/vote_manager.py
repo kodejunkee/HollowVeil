@@ -92,6 +92,7 @@ def tally_votes(room: GameRoom) -> dict[str, Any]:
 
     # Determine outcome
     if not vote_counts:
+        room.add_timeline_event("Noon", "No one was voted out. The village could not decide.")
         return {
             "outcome": "no_execution",
             "skip_count": skip_count,
@@ -103,6 +104,7 @@ def tally_votes(room: GameRoom) -> dict[str, Any]:
 
     # Skip wins if it has more votes
     if skip_count > max_votes:
+        room.add_timeline_event("Noon", "The village chose to skip the execution.")
         return {
             "outcome": "no_execution",
             "skip_count": skip_count,
@@ -118,6 +120,7 @@ def tally_votes(room: GameRoom) -> dict[str, Any]:
     # Tie → no execution
     if len(top_targets) > 1:
         names = [room.get_player(t).display_name if room.get_player(t) else t for t in top_targets]
+        room.add_timeline_event("Noon", f"The vote was tied between {', '.join(names)}. No one was executed.")
         return {
             "outcome": "no_execution",
             "skip_count": skip_count,
@@ -128,6 +131,7 @@ def tally_votes(room: GameRoom) -> dict[str, Any]:
 
     # Skip ties with top target → no execution
     if skip_count >= max_votes:
+        room.add_timeline_event("Noon", "The village could not reach a majority.")
         return {
             "outcome": "no_execution",
             "skip_count": skip_count,
@@ -144,6 +148,8 @@ def tally_votes(room: GameRoom) -> dict[str, Any]:
             "votes": voter_details,
             "message": "Vote target no longer valid.",
         }
+
+    room.add_timeline_event("Noon", f"Town voted to execute {executed.display_name}")
 
     return {
         "outcome": "execution",

@@ -54,7 +54,8 @@ class GameRoom:
     phase_end_time: float = 0  # unix timestamp when current phase expires
 
     # ── Phase Timer Handle ────────────────────────────────────────────────
-    _phase_task: asyncio.Task | None = field(default=None, repr=False)
+    _phase_task: asyncio.Task | None = field(default=None, init=False, repr=False)
+    _lobby_countdown_task: asyncio.Task | None = field(default=None, init=False, repr=False)
 
     # ── Night Actions Buffer ──────────────────────────────────────────────
     night_actions: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -76,6 +77,16 @@ class GameRoom:
 
     # ── Event Log (broadcast to clients at dawn) ──────────────────────────
     night_log: list[dict[str, Any]] = field(default_factory=list)
+
+    # ── Full Event Timeline ───────────────────────────────────────────────
+    timeline: list[dict[str, Any]] = field(default_factory=list)
+
+    def add_timeline_event(self, phase: str, message: str) -> None:
+        self.timeline.append({
+            "day": self.round_number,
+            "phase": phase,
+            "message": message,
+        })
 
     # ── Necromancer Final Whisper Tracking ────────────────────────────────
     final_whisper_used_by: set[str] = field(default_factory=set)

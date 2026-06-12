@@ -116,6 +116,14 @@ class MessageHandler:
             player._is_ready = False
         player._is_ready = data.get("is_ready", not player._is_ready)
 
+        # Cancel countdown if someone unreadies
+        if not player._is_ready and room._lobby_countdown_task:
+            room._lobby_countdown_task.cancel()
+            room._lobby_countdown_task = None
+            await self.mgr.broadcast(room.room_id, {
+                "type": "lobby_countdown_stopped",
+            })
+
         await self.mgr.broadcast(room.room_id, {
             "type": "lobby_update",
             **room.lobby_state(),
@@ -139,11 +147,27 @@ class MessageHandler:
             })
             return
 
-        try:
-            print(f"Starting game with {player_count} players...", flush=True)
-            await self._start_game(room)
-        except Exception as e:
-            print(f"FAILED TO START GAME: {e}", flush=True)
+        if room._lobby_countdown_task:
+            return  # Already counting down
+
+        async def countdown():
+            try:
+                for i in range(10, 0, -1):
+                    await self.mgr.broadcast(room.room_id, {
+                        "type": "lobby_countdown",
+                        "remaining": i,
+                    })
+                    await asyncio.sleep(1)
+                
+                room._lobby_countdown_task = None
+                await self.mgr.broadcast(room.room_id, {
+                    "type": "lobby_countdown_stopped",
+                })
+                await self._start_game(room)
+            except asyncio.CancelledError:
+                pass
+
+        room._lobby_countdown_task = asyncio.create_task(countdown())
 
     async def _player_disconnect(self, room: GameRoom, user_id: str) -> None:
         player = room.get_player(user_id)
@@ -337,6 +361,7 @@ class MessageHandler:
             "message": win["message"],
             "winners": win["winners"],
             "all_roles": all_roles,
+            "timeline": room.timeline,
         })
 
     # ── Chat ──────────────────────────────────────────────────────────────

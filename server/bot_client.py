@@ -68,7 +68,7 @@ class BotClient:
         uri = f"{WS_URL}/ws/{room_id}?token={token}"
         logger.info(f"[{self.name}] Connecting to {uri}")
         try:
-            self.ws = await websockets.connect(uri)
+            self.ws = await websockets.connect(uri, ping_interval=None)
             logger.info(f"[{self.name}] Connected!")
             asyncio.create_task(self.listen())
         except Exception as e:
@@ -79,8 +79,8 @@ class BotClient:
             async for message in self.ws:
                 data = json.loads(message)
                 await self.handle_message(data)
-        except websockets.exceptions.ConnectionClosed:
-            logger.info(f"[{self.name}] Connection closed.")
+        except websockets.exceptions.ConnectionClosed as e:
+            logger.info(f"[{self.name}] Connection closed. Code: {e.code}, Reason: {e.reason}")
 
     async def send(self, data: dict[str, Any]):
         if self.ws:
@@ -93,8 +93,9 @@ class BotClient:
             self.players = {p["user_id"]: p["display_name"] for p in data.get("players", [])}
             logger.info(f"[{self.name}] Lobby update. Players: {len(self.players)}")
             
-            # Automatically ready up
-            if data.get("phase") == "lobby":
+            # Automatically ready up ONLY once
+            if data.get("phase") == "lobby" and not getattr(self, "has_readied", False):
+                self.has_readied = True
                 await asyncio.sleep(random.uniform(0.5, 2.0))
                 await self.send({"type": "lobby_ready", "is_ready": True})
 
@@ -189,25 +190,33 @@ class BotClient:
 async def create_room(token: str) -> str:
     # Use httpx to call the REST endpoint to create a room
     headers = {"Authorization": f"Bearer {token}"}
-    # For testing, we just use the quickplay endpoint which finds or creates
     url = f"{SERVER_URL}/api/rooms/quickplay?token={token}"
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url)
-        resp.raise_for_status()
-        data = resp.json()
-        logger.info(f"Room ready: {data['room_id']} (Code: {data['room_code']})")
-        return data["room_id"]
+    
+    while True:
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url)
+                resp.raise_for_status()
+                data = resp.json()
+                logger.info(f"Room ready: {data['room_id']} (Code: {data['room_code']})")
+                return data["room_id"], data["room_code"]
+        except Exception as e:
+            logger.info(f"Waiting for server to start... ({e})")
+            await asyncio.sleep(2)
 
 
 async def main():
     logger.info("Starting bot simulation...")
     
-    # Needs 8 players to start technically, but we modified it to 1+ for prototyping
-    num_bots = 8 
+    # Needs 8 players to start. We'll spawn 7 bots, so the user can be the 8th!
+    num_bots = 7
     
     host_id = generate_user_id()
     host_token = generate_token(host_id, "Bot-1")
-    room_id = await create_room(host_token)
+    room_id, room_code = await create_room(host_token)
+    
+    with open("current_bot_room.txt", "w") as f:
+        f.write(room_code)
     
     bots = []
     for i in range(num_bots):
@@ -222,12 +231,12 @@ async def main():
         await asyncio.sleep(0.2)
         
     # Give everyone time to connect and ready up
-    logger.info("Waiting for all bots to join the lobby...")
-    while len(bots[0].players) < num_bots:
+    logger.info("Waiting for the real player to join the lobby...")
+    while len(bots[0].players) < 8:
         await asyncio.sleep(1)
     
-    logger.info("All bots joined. Waiting for ready status...")
-    await asyncio.sleep(3) # Give them time to send lobby_ready
+    logger.info("Real player joined! Waiting 5 seconds before host starts...")
+    await asyncio.sleep(5) # Give the user time to see the lobby and ready up
     
     # Host starts the game
     logger.info("Host is starting the game...")

@@ -108,4 +108,5 @@ class Player:
             "display_name": self.display_name,
             "is_alive": self.is_alive,
             "is_connected": self.is_connected,
+            "is_ready": getattr(self, "_is_ready", False),
         }

@@ -21,7 +21,6 @@ SPECIAL_POOL: list[RoleType] = [
     RoleType.HUNTER,
     RoleType.NECROMANCER,
     RoleType.JESTER,
-    RoleType.CURSED_VILLAGER,
 ]
 
 
@@ -51,7 +50,7 @@ def assign_roles(players: dict[str, Player]) -> None:
     # Mandatory roles
     role_list.append(RoleType.SEER)
     role_list.append(RoleType.WARDEN)
-    role_list.append(RoleType.WEREWOLF)
+    role_list.append(RoleType.CURSED_VILLAGER)
 
     # Vampires
     num_vampires = 2 if count <= 9 else 3

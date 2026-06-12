@@ -18,7 +18,7 @@ from app.ws.connection_manager import manager
 logger = logging.getLogger("hollowveil.timer")
 
 # How often (in seconds) countdown ticks are broadcast to clients
-TICK_INTERVAL = 5
+TICK_INTERVAL = 1
 
 
 async def run_phase_timer(
@@ -46,8 +46,8 @@ async def run_phase_timer(
         while remaining > 0:
             # Broadcast current remaining time
             await manager.broadcast(room_id, {
-                "type": "phase_tick",
-                "remaining_seconds": remaining,
+                "type": "time_update",
+                "remaining": remaining,
             })
 
             # Sleep for the shorter of tick_interval and remaining time
@@ -57,8 +57,8 @@ async def run_phase_timer(
 
         # Final zero tick
         await manager.broadcast(room_id, {
-            "type": "phase_tick",
-            "remaining_seconds": 0,
+            "type": "time_update",
+            "remaining": 0,
         })
 
         # Phase expired — invoke callback
