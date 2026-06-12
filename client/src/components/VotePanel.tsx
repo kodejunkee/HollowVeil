@@ -5,11 +5,13 @@ import PlayerList from './PlayerList';
 import { wsClient } from '../services/websocket';
 
 export default function VotePanel() {
-  const { players, voteCounts, votesCast, myUserId } = useGameStore();
+  const { players, voteCounts, votesCast, myUserId, isAlive, myRole } = useGameStore();
   const [hasVoted, setHasVoted] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
 
-  const alivePlayers = players.filter(p => p.is_alive);
+  // Sort alive players first, dead players at the bottom
+  const sortedPlayers = [...players].sort((a, b) => Number(b.is_alive) - Number(a.is_alive));
+  const canVote = isAlive || myRole === 'NECROMANCER';
 
   const handleVote = () => {
     if (!selectedTarget) return;
@@ -30,10 +32,12 @@ export default function VotePanel() {
       
       {hasVoted ? (
         <Text style={styles.message}>Vote registered. Waiting for others...</Text>
+      ) : !canVote ? (
+        <Text style={styles.message}>You are dead and cannot vote.</Text>
       ) : (
         <>
           <PlayerList 
-            players={alivePlayers} 
+            players={sortedPlayers} 
             selectedId={selectedTarget} 
             onSelect={setSelectedTarget} 
           />

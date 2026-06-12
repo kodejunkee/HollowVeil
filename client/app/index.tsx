@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuthStore } from '../src/stores/authStore';
 import { useGameStore } from '../src/stores/gameStore';
@@ -35,7 +36,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.title}>HollowVeil</Text>
       <Text style={styles.subtitle}>Welcome, {user.user_metadata?.display_name || user.email}</Text>
 
@@ -61,7 +62,7 @@ export default function HomeScreen() {
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

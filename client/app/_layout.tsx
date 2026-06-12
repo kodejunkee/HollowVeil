@@ -4,12 +4,15 @@ import { useAuthStore } from '../src/stores/authStore';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Text } from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 export default function RootLayout() {
   const { initialize, isLoading } = useAuthStore();
 
   useEffect(() => {
     initialize();
+    // Lock to landscape orientation
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
   }, []);
 
   if (isLoading) {

@@ -15,7 +15,8 @@ export class GameWebSocket {
     this.roomId = roomId;
     this.token = authToken;
 
-    const wsUrl = `${serverUrl}/ws/${roomId}?token=${authToken}`;
+    const baseWsUrl = serverUrl.replace(/^http/, 'ws');
+    const wsUrl = `${baseWsUrl}/ws/${roomId}?token=${authToken}`;
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {

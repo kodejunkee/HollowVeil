@@ -12,6 +12,12 @@ export default function GameScreen() {
   const { phase, timeRemaining, myRole, myUserId, updateState, dawnEvents, gameOverData, timelineEvents } = useGameStore();
   const [showTimeline, setShowTimeline] = useState(false);
 
+  const groupedTimeline = (gameOverData?.timeline || []).reduce((acc: any, event: any) => {
+    if (!acc[event.day]) acc[event.day] = [];
+    acc[event.day].push(event);
+    return acc;
+  }, {});
+
   useEffect(() => {
     wsClient.onMessage = (msg) => {
       updateState(msg);
@@ -107,13 +113,18 @@ export default function GameScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Match Timeline</Text>
             <ScrollView style={styles.timelineScroll}>
-              {timelineEvents.map((evt, idx) => (
-                <View key={idx} style={styles.timelineItem}>
-                  <Text style={styles.timelinePhase}>[{evt.phase}]</Text>
-                  <Text style={styles.timelineText}>{evt.message}</Text>
+              {Object.keys(groupedTimeline).map(day => (
+                <View key={day} style={styles.timelineDayContainer}>
+                  <Text style={styles.timelineDayTitle}>[Day {day}]</Text>
+                  {groupedTimeline[day].map((evt: any, idx: number) => (
+                    <View key={idx} style={styles.timelineItem}>
+                      <Text style={styles.timelinePhase}>({evt.phase})</Text>
+                      <Text style={styles.timelineText}>{evt.message}</Text>
+                    </View>
+                  ))}
                 </View>
               ))}
-              {timelineEvents.length === 0 && <Text style={styles.cardContent}>No events recorded.</Text>}
+              {(!gameOverData?.timeline || gameOverData.timeline.length === 0) && <Text style={styles.cardContent}>No events recorded.</Text>}
             </ScrollView>
             <TouchableOpacity style={styles.closeBtn} onPress={() => setShowTimeline(false)}>
               <Text style={styles.closeBtnText}>Close</Text>
@@ -143,9 +154,11 @@ const styles = StyleSheet.create({
   modalContent: { width: '90%', maxHeight: '80%', backgroundColor: '#1a1a2e', borderRadius: 10, padding: 20, borderWidth: 1, borderColor: '#2a2a4a' },
   modalTitle: { fontSize: 24, fontWeight: 'bold', color: '#e0e0e0', marginBottom: 15, textAlign: 'center' },
   timelineScroll: { marginBottom: 15 },
-  timelineItem: { marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#333', paddingBottom: 10 },
-  timelinePhase: { color: '#7c3aed', fontWeight: 'bold', marginBottom: 2 },
-  timelineText: { color: '#e0e0e0' },
+  timelineItem: { flexDirection: 'row', marginBottom: 10 },
+  timelinePhase: { color: '#7c3aed', fontWeight: 'bold', marginRight: 10, minWidth: 60 },
+  timelineText: { color: '#e0e0e0', flex: 1 },
+  timelineDayContainer: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#333', paddingBottom: 10 },
+  timelineDayTitle: { fontSize: 18, fontWeight: 'bold', color: '#10b981', marginBottom: 10 },
   closeBtn: { backgroundColor: '#dc2626', padding: 15, borderRadius: 8, alignItems: 'center' },
   closeBtnText: { color: '#fff', fontWeight: 'bold' }
 });

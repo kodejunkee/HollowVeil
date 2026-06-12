@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGameStore } from '../src/stores/gameStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { wsClient } from '../src/services/websocket';
@@ -7,13 +8,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 export default function LobbyScreen() {
   const { session } = useAuthStore();
-  const { players, phase, updateState, myUserId, reset, isHost } = useGameStore();
+  const { players, phase, updateState, myUserId, reset, isHost, lobbyCountdown } = useGameStore();
   const [loading, setLoading] = useState(true);
   const params = useLocalSearchParams();
 
-  // Hardcoded for Android emulator. In production, use environment variables.
-  const SERVER_URL = 'http://10.0.2.2:8000';
-  const WS_URL = 'ws://10.0.2.2:8000';
+  // Fallback to local Wi-Fi IP for testing on physical devices
+  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.107.114.13:8000';
 
   useEffect(() => {
     let mounted = true;
@@ -22,10 +22,17 @@ export default function LobbyScreen() {
       try {
         let roomId = '';
         if (params.mode === 'private' && params.code) {
-           // Wait, do we have an API to resolve code -> room_id?
-           // Currently we don't have an API to join by code. 
-           // I'll assume we can't join private rooms via code yet for Phase 2 prototype.
-           throw new Error("Joining by code not implemented in backend yet");
+           const res = await fetch(`${SERVER_URL}/api/rooms/join?token=${session.access_token}`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ room_code: params.code })
+           });
+           if (!res.ok) {
+             const errorText = await res.text();
+             throw new Error(`Failed to join (Status ${res.status}): ${errorText}`);
+           }
+           const data = await res.json();
+           roomId = data.room_id;
         } else {
            // Quickplay fetch
            const res = await fetch(`${SERVER_URL}/api/rooms/quickplay?token=${session.access_token}`, {
@@ -80,10 +87,10 @@ export default function LobbyScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <ActivityIndicator size="large" color="#7c3aed" />
         <Text style={{color: '#e0e0e0', marginTop: 10}}>Finding match...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -93,7 +100,13 @@ export default function LobbyScreen() {
   const readyCount = players.filter(p => p.is_ready).length;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      {lobbyCountdown !== null && (
+        <View style={styles.countdownContainer}>
+          <Text style={styles.countdownText}>Game starting in {lobbyCountdown}...</Text>
+        </View>
+      )}
+      
       <Text style={styles.title}>Lobby</Text>
       <Text style={styles.subtitle}>Players: {players.length}/12</Text>
 
@@ -107,8 +120,8 @@ export default function LobbyScreen() {
       </ScrollView>
 
       <View style={styles.controls}>
-        <TouchableOpacity style={[styles.button, { backgroundColor: isReady ? '#6b7280' : '#7c3aed' }]} onPress={handleToggleReady}>
-          <Text style={styles.buttonText}>{isReady ? 'Unready' : 'Ready'}</Text>
+        <TouchableOpacity style={[styles.button, { backgroundColor: isReady ? '#dc2626' : '#7c3aed' }]} onPress={handleToggleReady}>
+          <Text style={styles.buttonText}>{isReady ? 'Cancel' : 'Ready'}</Text>
         </TouchableOpacity>
 
         {isHost && (
@@ -121,17 +134,21 @@ export default function LobbyScreen() {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#dc2626' }]} onPress={handleLeave}>
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: isReady ? '#4b5563' : '#dc2626' }]} 
+          onPress={handleLeave}
+          disabled={isReady}
+        >
           <Text style={styles.buttonText}>Leave</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f', padding: 20 },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#e0e0e0', textAlign: 'center', marginTop: 40 },
+  title: { fontSize: 32, fontWeight: 'bold', color: '#e0e0e0', textAlign: 'center', marginTop: 10 },
   subtitle: { fontSize: 16, color: '#aaa', textAlign: 'center', marginBottom: 20 },
   playerList: { flex: 1, backgroundColor: '#1a1a2e', borderRadius: 10, padding: 10 },
   playerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#2a2a4a' },
@@ -139,5 +156,7 @@ const styles = StyleSheet.create({
   statusIndicator: { width: 15, height: 15, borderRadius: 7.5 },
   controls: { marginTop: 20, gap: 10 },
   button: { padding: 15, borderRadius: 8, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  countdownContainer: { backgroundColor: '#7c3aed', padding: 15, borderRadius: 10, marginBottom: 10, alignItems: 'center' },
+  countdownText: { color: '#fff', fontSize: 20, fontWeight: 'bold' }
 });

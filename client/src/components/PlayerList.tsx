@@ -12,9 +12,10 @@ interface PlayerListProps {
   onSelect?: (userId: string) => void;
   selectedId?: string | null;
   disabled?: boolean;
+  allowSelectDead?: boolean;
 }
 
-export default function PlayerList({ players, onSelect, selectedId, disabled }: PlayerListProps) {
+export default function PlayerList({ players, onSelect, selectedId, disabled, allowSelectDead }: PlayerListProps) {
   return (
     <View style={styles.container}>
       {players.map(p => {
@@ -27,11 +28,11 @@ export default function PlayerList({ players, onSelect, selectedId, disabled }: 
               !p.is_alive && styles.deadRow,
               isSelected && styles.selectedRow
             ]}
-            onPress={() => onSelect && p.is_alive && onSelect(p.user_id)}
-            disabled={disabled || !p.is_alive || !onSelect}
+            onPress={() => onSelect && (!allowSelectDead ? p.is_alive : !p.is_alive) && onSelect(p.user_id)}
+            disabled={disabled || !onSelect || (!allowSelectDead ? !p.is_alive : p.is_alive)}
           >
             <Text style={[styles.name, !p.is_alive && styles.deadText]}>
-              {p.display_name} {p.is_alive ? '' : '(Dead)'}
+              {p.display_name} {p.is_alive ? '' : '💀'}
             </Text>
             {isSelected && <Text style={styles.selectedIcon}>✓</Text>}
           </TouchableOpacity>

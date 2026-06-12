@@ -29,21 +29,23 @@ export default function NightActionPanel() {
 
   // Filter valid targets based on role
   const getValidTargets = () => {
-    const alivePlayers = players.filter(p => p.is_alive);
-    const deadPlayers = players.filter(p => !p.is_alive);
-    const others = alivePlayers.filter(p => p.user_id !== myUserId);
-
+    const sortedPlayers = [...players].sort((a, b) => Number(b.is_alive) - Number(a.is_alive));
+    
     switch (myRole) {
       case 'SEER':
       case 'WEREWOLF':
       case 'VAMPIRE':
       case 'HUNTER':
-        return others;
+        return sortedPlayers.filter(p => p.user_id !== myUserId);
       case 'WARDEN':
         // TODO: exclude last protected
-        return alivePlayers;
+        return sortedPlayers;
       case 'NECROMANCER':
-        return deadPlayers;
+        // Necromancer only revives dead players, so we show all players but only allow selecting dead ones.
+        // Actually, PlayerList inherently disables dead players. We need Necromancer to select *dead* players.
+        // Let's pass all players, but we need PlayerList to allow selecting dead players for Necromancer.
+        // Wait, PlayerList has `p.is_alive` hardcoded in `disabled`. We will fix this by passing an override.
+        return sortedPlayers;
       default:
         return [];
     }
@@ -65,6 +67,7 @@ export default function NightActionPanel() {
             players={targets} 
             selectedId={selectedTarget} 
             onSelect={setSelectedTarget} 
+            allowSelectDead={myRole === 'NECROMANCER'}
           />
           <TouchableOpacity 
             style={[styles.submitBtn, !selectedTarget && styles.disabledBtn]} 
