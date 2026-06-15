@@ -12,8 +12,7 @@ export default function LobbyScreen() {
   const [loading, setLoading] = useState(true);
   const params = useLocalSearchParams();
 
-  // Fallback to local Wi-Fi IP for testing on physical devices
-  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.107.114.13:8000';
+  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.79.158.13:8000';
 
   useEffect(() => {
     let mounted = true;
@@ -34,7 +33,6 @@ export default function LobbyScreen() {
            const data = await res.json();
            roomId = data.room_id;
         } else {
-           // Quickplay fetch
            const res = await fetch(`${SERVER_URL}/api/rooms/quickplay?token=${session.access_token}`, {
              method: 'POST'
            });
@@ -61,11 +59,7 @@ export default function LobbyScreen() {
     };
 
     connectToGame();
-
-    return () => {
-      mounted = false;
-      // Note: we don't disconnect here because we want to keep the connection when navigating to /game
-    };
+    return () => { mounted = false; };
   }, []);
 
   const handleToggleReady = () => {
@@ -88,75 +82,99 @@ export default function LobbyScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#7c3aed" />
-        <Text style={{color: '#e0e0e0', marginTop: 10}}>Finding match...</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#7c3aed" />
+          <Text style={{ color: '#e0e0e0', marginTop: 10 }}>Finding match...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   const me = players.find(p => p.user_id === myUserId);
   const isReady = me?.is_ready || false;
-  
   const readyCount = players.filter(p => p.is_ready).length;
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Top countdown bar */}
       {lobbyCountdown !== null && (
-        <View style={styles.countdownContainer}>
+        <View style={styles.countdownBar}>
           <Text style={styles.countdownText}>Game starting in {lobbyCountdown}...</Text>
         </View>
       )}
-      
-      <Text style={styles.title}>Lobby</Text>
-      <Text style={styles.subtitle}>Players: {players.length}/12</Text>
 
-      <ScrollView style={styles.playerList}>
-        {players.map((p, index) => (
-          <View key={index} style={styles.playerRow}>
-            <Text style={styles.playerName}>{p.display_name} {p.user_id === myUserId ? '(You)' : ''}</Text>
-            <View style={[styles.statusIndicator, { backgroundColor: p.is_ready ? '#10b981' : '#6b7280' }]} />
+      <View style={styles.layout}>
+        {/* Left side - Player list */}
+        <View style={styles.playerSide}>
+          <View style={styles.playerHeader}>
+            <Text style={styles.title}>Lobby</Text>
+            <Text style={styles.subtitle}>Players: {players.length}/12</Text>
           </View>
-        ))}
-      </ScrollView>
+          <ScrollView style={styles.playerList}>
+            {players.map((p, index) => (
+              <View key={index} style={styles.playerRow}>
+                <Text style={styles.playerName}>
+                  {p.display_name} {p.user_id === myUserId ? '(You)' : ''}
+                </Text>
+                <View style={[styles.statusDot, { backgroundColor: p.is_ready ? '#10b981' : '#6b7280' }]} />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
 
-      <View style={styles.controls}>
-        <TouchableOpacity style={[styles.button, { backgroundColor: isReady ? '#dc2626' : '#7c3aed' }]} onPress={handleToggleReady}>
-          <Text style={styles.buttonText}>{isReady ? 'Cancel' : 'Ready'}</Text>
-        </TouchableOpacity>
-
-        {isHost && (
-          <TouchableOpacity 
-            style={[styles.button, { backgroundColor: readyCount >= 8 ? '#3b82f6' : '#1e3a8a' }]} 
-            onPress={handleStartGame}
-            disabled={readyCount < 8}
+        {/* Right side - Controls */}
+        <View style={styles.controlSide}>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: isReady ? '#dc2626' : '#7c3aed' }]}
+            onPress={handleToggleReady}
           >
-            <Text style={styles.buttonText}>Start Game</Text>
+            <Text style={styles.buttonText}>{isReady ? 'Cancel' : 'Ready'}</Text>
           </TouchableOpacity>
-        )}
 
-        <TouchableOpacity 
-          style={[styles.button, { backgroundColor: isReady ? '#4b5563' : '#dc2626' }]} 
-          onPress={handleLeave}
-          disabled={isReady}
-        >
-          <Text style={styles.buttonText}>Leave</Text>
-        </TouchableOpacity>
+          {isHost && (
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: readyCount >= 8 ? '#3b82f6' : '#1e3a8a', opacity: readyCount < 8 ? 0.5 : 1 }]}
+              onPress={handleStartGame}
+              disabled={readyCount < 8}
+            >
+              <Text style={styles.buttonText}>Start Game</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: isReady ? '#4b5563' : '#dc2626' }]}
+            onPress={handleLeave}
+            disabled={isReady}
+          >
+            <Text style={styles.buttonText}>Leave</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.readyInfo}>{readyCount}/{players.length} Ready</Text>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f', padding: 20 },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#e0e0e0', textAlign: 'center', marginTop: 10 },
-  subtitle: { fontSize: 16, color: '#aaa', textAlign: 'center', marginBottom: 20 },
-  playerList: { flex: 1, backgroundColor: '#1a1a2e', borderRadius: 10, padding: 10 },
-  playerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#2a2a4a' },
-  playerName: { color: '#e0e0e0', fontSize: 18 },
-  statusIndicator: { width: 15, height: 15, borderRadius: 7.5 },
-  controls: { marginTop: 20, gap: 10 },
-  button: { padding: 15, borderRadius: 8, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  countdownContainer: { backgroundColor: '#7c3aed', padding: 15, borderRadius: 10, marginBottom: 10, alignItems: 'center' },
-  countdownText: { color: '#fff', fontSize: 20, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  layout: { flex: 1, flexDirection: 'row', padding: 16, gap: 16 },
+  countdownBar: { backgroundColor: '#7c3aed', paddingVertical: 10, alignItems: 'center' },
+  countdownText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+
+  // Left - players
+  playerSide: { flex: 2 },
+  playerHeader: { marginBottom: 10 },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#e0e0e0' },
+  subtitle: { fontSize: 14, color: '#aaa', marginTop: 2 },
+  playerList: { flex: 1, backgroundColor: '#1a1a2e', borderRadius: 10, padding: 8 },
+  playerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#2a2a4a' },
+  playerName: { color: '#e0e0e0', fontSize: 15 },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+
+  // Right - controls
+  controlSide: { flex: 1, justifyContent: 'center', gap: 12 },
+  button: { padding: 14, borderRadius: 8, alignItems: 'center' },
+  buttonText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  readyInfo: { color: '#aaa', textAlign: 'center', fontSize: 13, marginTop: 4 },
 });

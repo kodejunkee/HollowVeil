@@ -26,6 +26,23 @@ logger = logging.getLogger("bot")
 SERVER_URL = "http://localhost:8000"
 WS_URL = "ws://localhost:8000"
 
+# ── Debug: Force the real player's role ───────────────────────────────
+# ⚠️  TEMPORARY — FOR TESTING ONLY
+# This forces the real player's role in bot mode so every role can be
+# manually verified. Remove or set to None before production.
+#
+# HOW TO REVERT:
+#   1. Set FORCE_PLAYER_ROLE = None  (below)
+#   2. Optionally remove the "debug_force_role" handler in
+#      server/app/ws/message_handler.py (lines marked TODO:REMOVE)
+#   3. Optionally remove the forced_roles parameter from
+#      server/app/engine/role_assigner.py (it's a no-op when None)
+#
+# Valid values: "seer", "warden", "hunter", "necromancer", "vampire",
+#               "jester", "cursed_villager", "villager"
+# Set to None for normal random assignment.
+FORCE_PLAYER_ROLE = "necromancer"
+
 import jwt
 import os
 import time
@@ -62,6 +79,9 @@ class BotClient:
         self.alive = True
         self.room_id = None
         self.players: dict[str, str] = {} # user_id -> name
+        self.player_ready: dict[str, bool] = {}  # user_id -> is_ready
+        self.alive_players: set[str] = set()  # user_ids of alive players
+        self.coven_mates: set[str] = set()  # user_ids of fellow vampires
 
     async def connect(self, room_id: str, token: str):
         self.room_id = room_id
@@ -91,7 +111,10 @@ class BotClient:
         
         if msg_type == "lobby_update":
             self.players = {p["user_id"]: p["display_name"] for p in data.get("players", [])}
-            logger.info(f"[{self.name}] Lobby update. Players: {len(self.players)}")
+            self.player_ready = {p["user_id"]: p.get("is_ready", False) for p in data.get("players", [])}
+            self.alive_players = {p["user_id"] for p in data.get("players", []) if p.get("is_alive", True)}
+            ready_count = sum(1 for r in self.player_ready.values() if r)
+            logger.info(f"[{self.name}] Lobby update. Players: {len(self.players)}, Ready: {ready_count}/{len(self.players)}")
             
             # Automatically ready up ONLY once
             if data.get("phase") == "lobby" and not getattr(self, "has_readied", False):
@@ -102,6 +125,14 @@ class BotClient:
         elif msg_type == "role_assigned":
             self.role = data.get("role")
             logger.info(f"[{self.name}] Role assigned: {self.role}")
+
+        elif msg_type == "game_state":
+            # Sync player state (alive status, coven-mates)
+            for p in data.get("players", []):
+                if not p.get("is_alive", True):
+                    self.alive_players.discard(p["user_id"])
+                if p.get("role") == "vampire":
+                    self.coven_mates.add(p["user_id"])
 
         elif msg_type == "phase_changed":
             phase = data.get("phase")
@@ -114,15 +145,26 @@ class BotClient:
 
         elif msg_type == "dawn_event":
             logger.info(f"[{self.name}] Dawn Event: {data.get('message')}")
-            if data.get("event") == "death" and data.get("target") == self.user_id:
-                self.alive = False
-                logger.info(f"[{self.name}] I have died.")
+            if data.get("event") == "death":
+                target = data.get("target")
+                self.alive_players.discard(target)
+                if target == self.user_id:
+                    self.alive = False
+                    logger.info(f"[{self.name}] I have died.")
+            elif data.get("event") == "necromancer_revive":
+                target = data.get("target")
+                self.alive_players.add(target)
+                if target == self.user_id:
+                    self.alive = True
 
         elif msg_type == "execution_result":
             logger.info(f"[{self.name}] Execution Result: {data.get('message')}")
-            if data.get("outcome") == "execution" and data.get("executed_id") == self.user_id:
-                self.alive = False
-                logger.info(f"[{self.name}] I have been executed.")
+            if data.get("outcome") == "execution":
+                executed_id = data.get("executed_id")
+                self.alive_players.discard(executed_id)
+                if executed_id == self.user_id:
+                    self.alive = False
+                    logger.info(f"[{self.name}] I have been executed.")
 
         elif msg_type == "game_over":
             logger.info(f"[{self.name}] Game Over! Winner: {data.get('winner')}")
@@ -137,27 +179,35 @@ class BotClient:
         target_id = None
         action = None
         
-        others = [uid for uid in self.players.keys() if uid != self.user_id]
-        if not others:
+        # Build valid target list: alive players, excluding self
+        alive_others = [uid for uid in self.alive_players if uid != self.user_id]
+        if not alive_others:
             return
 
         if self.role == "seer":
             action = "investigate"
-            target_id = random.choice(others)
+            target_id = random.choice(alive_others)
         elif self.role == "warden":
             action = "protect"
-            target_id = random.choice(list(self.players.keys())) # Can protect self
+            # Can protect self too
+            alive_all = [uid for uid in self.alive_players]
+            target_id = random.choice(alive_all) if alive_all else None
         elif self.role == "hunter":
             # 50% chance to shoot if hunter
             if random.random() > 0.5:
                 action = "shoot"
-                target_id = random.choice(others)
+                target_id = random.choice(alive_others)
         elif self.role == "vampire":
             action = "bite"
-            target_id = random.choice(others)
+            # Filter out coven-mates
+            valid_targets = [uid for uid in alive_others if uid not in self.coven_mates]
+            if valid_targets:
+                target_id = random.choice(valid_targets)
+            else:
+                return  # No valid non-coven targets
         elif self.role == "werewolf":
             action = "maul"
-            target_id = random.choice(others)
+            target_id = random.choice(alive_others)
             
         if action and target_id:
             logger.info(f"[{self.name}] Submitting night action: {action} on {self.players.get(target_id)}")
@@ -175,10 +225,11 @@ class BotClient:
             target_id = "skip"
             logger.info(f"[{self.name}] Voting to skip")
         else:
-            others = [uid for uid in self.players.keys() if uid != self.user_id]
-            if not others:
+            # Only vote for alive players, excluding self
+            alive_others = [uid for uid in self.alive_players if uid != self.user_id]
+            if not alive_others:
                 return
-            target_id = random.choice(others)
+            target_id = random.choice(alive_others)
             logger.info(f"[{self.name}] Voting for {self.players.get(target_id)}")
             
         await self.send({
@@ -232,11 +283,38 @@ async def main():
         
     # Give everyone time to connect and ready up
     logger.info("Waiting for the real player to join the lobby...")
+    bot_ids = {b.user_id for b in bots}
     while len(bots[0].players) < 8:
         await asyncio.sleep(1)
     
-    logger.info("Real player joined! Waiting 5 seconds before host starts...")
-    await asyncio.sleep(5) # Give the user time to see the lobby and ready up
+    # Identify the real player (the one who isn't a bot)
+    real_player_id = None
+    for uid in bots[0].players:
+        if uid not in bot_ids:
+            real_player_id = uid
+            break
+    
+    logger.info(f"Real player joined! ID: {real_player_id}")
+    
+    # Force role if configured
+    if FORCE_PLAYER_ROLE and real_player_id:
+        logger.info(f"Forcing real player role to: {FORCE_PLAYER_ROLE}")
+        await bots[0].send({
+            "type": "debug_force_role",
+            "target_id": real_player_id,
+            "role": FORCE_PLAYER_ROLE,
+        })
+    
+    # Wait for the real player to ready up
+    logger.info("Waiting for all players to be ready...")
+    while True:
+        all_ready = len(bots[0].player_ready) >= 8 and all(bots[0].player_ready.values())
+        if all_ready:
+            break
+        await asyncio.sleep(1)
+    
+    logger.info("All players ready! Starting game in 3 seconds...")
+    await asyncio.sleep(3)
     
     # Host starts the game
     logger.info("Host is starting the game...")

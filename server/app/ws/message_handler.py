@@ -59,6 +59,8 @@ class MessageHandler:
                 await self._action_submit(room, user_id, data)
             elif msg_type == "vote_cast":
                 await self._vote_cast(room, user_id, data)
+            elif msg_type == "debug_force_role":
+                await self._debug_force_role(room, user_id, data)
             else:
                 await self.mgr.send_personal(room.room_id, user_id, {
                     "type": "error",
@@ -147,6 +149,18 @@ class MessageHandler:
             })
             return
 
+        # All players must be ready
+        not_ready = [
+            p.display_name for p in room.players.values()
+            if not getattr(p, "_is_ready", False)
+        ]
+        if not_ready:
+            await self.mgr.send_personal(room.room_id, user_id, {
+                "type": "error",
+                "message": f"Not all players are ready. Waiting on: {', '.join(not_ready)}",
+            })
+            return
+
         if room._lobby_countdown_task:
             return  # Already counting down
 
@@ -181,6 +195,30 @@ class MessageHandler:
                 "type": "lobby_update",
                 **room.lobby_state(),
             })
+    # ── Debug / Testing ────────────────────────────────────────────────────
+    # TODO:REMOVE — Temporary debug handler for forcing player roles during
+    # bot testing. Remove this entire block and its route in handle() after
+    # testing is complete. See bot_client.py for full revert instructions.
+
+    async def _debug_force_role(
+        self, room: GameRoom, user_id: str, data: dict,
+    ) -> None:
+        """Store a forced role for a player (debug/bot-testing only)."""
+        if room.phase != GamePhase.LOBBY:
+            return
+        target_id = data.get("target_id", user_id)
+        role_str = data.get("role", "").lower()
+        try:
+            role = RoleType(role_str)
+        except ValueError:
+            await self.mgr.send_personal(room.room_id, user_id, {
+                "type": "error", "message": f"Unknown role: {role_str}",
+            })
+            return
+        if not hasattr(room, "_debug_forced_roles"):
+            room._debug_forced_roles = {}
+        room._debug_forced_roles[target_id] = role
+        logger.info("DEBUG: Forced role %s for %s in room %s", role.value, target_id, room.room_id)
 
     # ── Game Flow ─────────────────────────────────────────────────────────
 
@@ -189,21 +227,27 @@ class MessageHandler:
         room.match_started_at = __import__("time").time()
 
         # Assign roles (mutates players in place)
-        role_assigner.assign_roles(room.players)
+        forced = getattr(room, '_debug_forced_roles', None)
+        role_assigner.assign_roles(room.players, forced_roles=forced)
 
         room.set_phase(GamePhase.ROLE_ASSIGNMENT)
 
         # Send each player their personal role
+        vampire_ids = room.get_vampire_ids()
         for uid, player in room.players.items():
             meta = ROLE_METADATA.get(player.role, {})
-            await self.mgr.send_personal(room.room_id, uid, {
+            role_msg: dict[str, Any] = {
                 "type": "role_assigned",
                 "role": player.role.value,
                 "role_name": meta.get("name", player.role.value),
                 "faction": meta.get("faction_label", ""),
                 "description": meta.get("description", ""),
                 "ability": meta.get("ability", ""),
-            })
+            }
+            # Tell vampires who their coven-mates are
+            if player.role == RoleType.VAMPIRE:
+                role_msg["coven_mate_ids"] = [vid for vid in vampire_ids if vid != uid]
+            await self.mgr.send_personal(room.room_id, uid, role_msg)
 
         # Broadcast phase change
         await self.mgr.broadcast(room.room_id, {
@@ -225,6 +269,19 @@ class MessageHandler:
             "round": room.round_number,
             "duration": settings.NIGHT_DURATION,
         })
+
+        # Tell the Necromancer which dead players are non-revivable (dead vampires)
+        for uid, player in room.players.items():
+            if player.role == RoleType.NECROMANCER and player.is_alive:
+                dead_vampire_ids = [
+                    p.user_id for p in room.players.values()
+                    if not p.is_alive and p.role == RoleType.VAMPIRE
+                ]
+                if dead_vampire_ids:
+                    await self.mgr.send_personal(room.room_id, uid, {
+                        "type": "non_revivable_ids",
+                        "ids": dead_vampire_ids,
+                    })
 
         # Start phase timer
         room.cancel_phase_task()
@@ -422,6 +479,24 @@ class MessageHandler:
                 "type": "error", "message": "Your role has no night action.",
             })
             return
+
+        # ── Target validation ─────────────────────────────────────────────
+        if target_id:
+            target = room.get_player(target_id)
+
+            # Vampires cannot target fellow vampires
+            if player.role == RoleType.VAMPIRE and target and target.role == RoleType.VAMPIRE:
+                await self.mgr.send_personal(room.room_id, user_id, {
+                    "type": "error", "message": "You cannot target a fellow Coven member.",
+                })
+                return
+
+            # Killing roles cannot target dead players (except Necromancer revive)
+            if action_name != "revive" and target and not target.is_alive:
+                await self.mgr.send_personal(room.room_id, user_id, {
+                    "type": "error", "message": "You cannot target a dead player.",
+                })
+                return
 
         # Store the action
         room.night_actions[user_id] = {

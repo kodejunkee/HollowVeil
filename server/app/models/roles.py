@@ -56,20 +56,27 @@ ROLE_FACTION_MAP: dict[RoleType, Faction] = {
 class SeerResult(str, Enum):
     """What the Seer learns when investigating a player."""
     TOWN = "town"
-    EVIL = "evil"
+    VAMPIRE = "Vampire"
+    WEREWOLF = "Werewolf"
+    JESTER = "Jester"
 
 
 def get_seer_result(role: RoleType) -> SeerResult:
     """Return what the Seer sees when they investigate a player with *role*.
 
-    The Cursed Villager is special-cased to read as Town.
+    - Cursed Villager reads as Town (they're still Town until transformed).
+    - Once transformed to Werewolf, their RoleType is WEREWOLF → returns Werewolf.
+    - Vampires → Vampire, Jester → Jester, all Town roles → Town.
     """
     if role == RoleType.CURSED_VILLAGER:
         return SeerResult.TOWN
-    faction = ROLE_FACTION_MAP[role]
-    if faction == Faction.TOWN:
-        return SeerResult.TOWN
-    return SeerResult.EVIL
+    if role == RoleType.VAMPIRE:
+        return SeerResult.VAMPIRE
+    if role == RoleType.WEREWOLF:
+        return SeerResult.WEREWOLF
+    if role == RoleType.JESTER:
+        return SeerResult.JESTER
+    return SeerResult.TOWN
 
 
 # ── Role Metadata (client-facing) ────────────────────────────────────────────

@@ -151,6 +151,14 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
         target = room.get_player(target_id)
         if not target or target.is_alive:
             continue
+        # Cannot revive a Vampire — prevents trolling
+        if target.role == RoleType.VAMPIRE:
+            events.append({
+                "event": "necromancer_blocked",
+                "recipient": player.user_id,
+                "message": "You cannot revive a Vampire.",
+            })
+            continue
         target.revive()
         player.has_revived = True
         room.add_timeline_event("Night", f"Necromancer ({player.display_name}) revived {target.display_name}")
@@ -204,9 +212,12 @@ def _resolve_coven_vote(room: GameRoom) -> str | None:
     if not vote_counts:
         return None
 
-    # Majority target (ties → first alphabetical target as tiebreaker)
+    # Highest-voted target wins; ties → no kill
     max_votes = max(vote_counts.values())
-    top_targets = sorted(t for t, c in vote_counts.items() if c == max_votes)
+    top_targets = [t for t, c in vote_counts.items() if c == max_votes]
+    if len(top_targets) > 1:
+        # Tie — vampires couldn't agree, no one is killed
+        return None
     return top_targets[0]
 
 

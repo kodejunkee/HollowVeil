@@ -18,6 +18,11 @@ interface GameState {
   timelineEvents: any[];
   gameOverData: any | null;
   lobbyCountdown: number | null;
+  executionData: any | null;
+  covenMateIds: string[];
+  hasRevived: boolean;
+  nonRevivableIds: string[];
+  hasFinalWhisper: boolean;
   
   setUserId: (id: string) => void;
   setRoom: (id: string, code: string | null) => void;
@@ -44,6 +49,11 @@ export const useGameStore = create<GameState>((set) => ({
   timelineEvents: [],
   gameOverData: null,
   lobbyCountdown: null,
+  executionData: null,
+  covenMateIds: [],
+  hasRevived: false,
+  nonRevivableIds: [],
+  hasFinalWhisper: false,
 
   setUserId: (id) => set({ myUserId: id }),
   setRoom: (id, code) => set({ roomId: id, roomCode: code }),
@@ -56,11 +66,18 @@ export const useGameStore = create<GameState>((set) => ({
           players: payload.players,
           isHost: payload.host_id === state.myUserId
         };
-      case 'game_state':
+      case 'game_state': {
+        // Reconnection sync — extract own alive status and role-specific fields
+        const myPlayer = payload.players?.find((p: any) => p.user_id === state.myUserId);
         return { 
           players: payload.players, 
-          phase: payload.phase ? payload.phase.toUpperCase() : state.phase 
+          phase: payload.phase ? payload.phase.toUpperCase() : state.phase,
+          round: payload.round_number || state.round,
+          isAlive: myPlayer ? myPlayer.is_alive : state.isAlive,
+          myRole: myPlayer?.role ? myPlayer.role.toUpperCase() : state.myRole,
+          timeRemaining: payload.remaining_seconds || state.timeRemaining,
         };
+      }
       case 'phase_changed':
         return { 
           phase: payload.phase.toUpperCase(), 
@@ -71,7 +88,11 @@ export const useGameStore = create<GameState>((set) => ({
           dawnEvents: payload.phase.toUpperCase() === 'DAWN' ? state.dawnEvents : []
         };
       case 'role_assigned':
-        return { myRole: payload.role ? payload.role.toUpperCase() : null };
+        return { 
+          myRole: payload.role ? payload.role.toUpperCase() : null,
+          covenMateIds: payload.coven_mate_ids || [],
+          hasFinalWhisper: payload.role?.toUpperCase() === 'NECROMANCER',
+        };
       case 'chat_message': 
         return { 
           chatMessages: [...state.chatMessages, { 
@@ -102,12 +123,13 @@ export const useGameStore = create<GameState>((set) => ({
       case 'execution_result':
         return {
           timelineEvents: [...state.timelineEvents, { ...payload, phase: 'EXECUTION', time: new Date().toISOString() }],
-          isAlive: (payload.outcome === 'execution' && payload.executed_id === state.myUserId) ? false : state.isAlive,
+          isAlive: (payload.event === 'execution' && payload.target === state.myUserId) ? false : state.isAlive,
           players: state.players.map(p => 
-            (payload.outcome === 'execution' && p.user_id === payload.executed_id) 
+            (payload.event === 'execution' && p.user_id === payload.target) 
               ? { ...p, is_alive: false } 
               : p
-          )
+          ),
+          executionData: payload
         };
       case 'lobby_countdown':
         return { lobbyCountdown: payload.remaining };
@@ -115,6 +137,8 @@ export const useGameStore = create<GameState>((set) => ({
         return { lobbyCountdown: null };
       case 'game_over':
         return { gameOverData: payload, phase: 'VICTORY' };
+      case 'non_revivable_ids':
+        return { nonRevivableIds: payload.ids || [] };
       default:
         return state;
     }
@@ -137,5 +161,10 @@ export const useGameStore = create<GameState>((set) => ({
     timelineEvents: [],
     gameOverData: null,
     lobbyCountdown: null,
+    executionData: null,
+    covenMateIds: [],
+    hasRevived: false,
+    nonRevivableIds: [],
+    hasFinalWhisper: false,
   })
 }));

@@ -5,26 +5,40 @@ import PlayerList from './PlayerList';
 import { wsClient } from '../services/websocket';
 
 export default function VotePanel() {
-  const { players, voteCounts, votesCast, myUserId, isAlive, myRole } = useGameStore();
+  const { players, voteCounts, votesCast, myUserId, isAlive, myRole, hasFinalWhisper } = useGameStore();
   const [hasVoted, setHasVoted] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
 
-  // Sort alive players first, dead players at the bottom
-  const sortedPlayers = [...players].sort((a, b) => Number(b.is_alive) - Number(a.is_alive));
-  const canVote = isAlive || myRole === 'NECROMANCER';
+  // Can this player vote?
+  const canVote = isAlive || (myRole === 'NECROMANCER' && hasFinalWhisper);
+
+  // Build selectable targets: alive players, excluding self
+  const selectablePlayers = players.filter(p => p.is_alive && p.user_id !== myUserId);
+
+  // Dead players for display context (non-interactive)
+  const deadPlayers = players.filter(p => !p.is_alive);
 
   const handleVote = () => {
     if (!selectedTarget) return;
     wsClient.send('vote_cast', { target_id: selectedTarget });
+    // Spend Final Whisper if dead necromancer
+    if (!isAlive && myRole === 'NECROMANCER') {
+      useGameStore.setState({ hasFinalWhisper: false });
+    }
     setHasVoted(true);
   };
 
   const handleSkip = () => {
     wsClient.send('vote_cast', { target_id: 'skip' });
+    // Spend Final Whisper if dead necromancer
+    if (!isAlive && myRole === 'NECROMANCER') {
+      useGameStore.setState({ hasFinalWhisper: false });
+    }
     setHasVoted(true);
   };
 
-
+  // Dead necromancer who already used their whisper
+  const usedWhisper = !isAlive && myRole === 'NECROMANCER' && !hasFinalWhisper;
 
   return (
     <View style={styles.container}>
@@ -32,15 +46,32 @@ export default function VotePanel() {
       
       {hasVoted ? (
         <Text style={styles.message}>Vote registered. Waiting for others...</Text>
+      ) : usedWhisper ? (
+        <Text style={styles.message}>💀 Your Final Whisper has been spent. The living decide now.</Text>
       ) : !canVote ? (
-        <Text style={styles.message}>You are dead and cannot vote.</Text>
+        <Text style={styles.message}>💀 You are dead and cannot vote.</Text>
       ) : (
         <>
+          {!isAlive && myRole === 'NECROMANCER' && (
+            <Text style={styles.whisperBanner}>👻 Final Whisper — your last vote from beyond the grave.</Text>
+          )}
           <PlayerList 
-            players={sortedPlayers} 
+            players={selectablePlayers} 
             selectedId={selectedTarget} 
             onSelect={setSelectedTarget} 
           />
+
+          {/* Show dead players as non-interactive context */}
+          {deadPlayers.length > 0 && (
+            <View style={styles.deadSection}>
+              <Text style={styles.deadSectionTitle}>Deceased</Text>
+              {deadPlayers.map(p => (
+                <View key={p.user_id} style={styles.deadRow}>
+                  <Text style={styles.deadName}>💀 {p.display_name}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           
           <View style={styles.btnRow}>
             <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
@@ -52,7 +83,7 @@ export default function VotePanel() {
               onPress={handleVote}
               disabled={!selectedTarget}
             >
-              <Text style={styles.btnText}>Cast Vote</Text>
+              <Text style={styles.btnText}>{!isAlive ? '👻 Final Whisper' : 'Cast Vote'}</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -82,5 +113,10 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   tallyArea: { marginTop: 20, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#2a2a4a' },
   tallyTitle: { color: '#aaa', marginBottom: 5 },
-  tallyText: { color: '#e0e0e0', fontSize: 16, marginVertical: 2 }
+  tallyText: { color: '#e0e0e0', fontSize: 16, marginVertical: 2 },
+  deadSection: { marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#222' },
+  deadSectionTitle: { color: '#666', fontSize: 13, marginBottom: 6, fontStyle: 'italic' },
+  deadRow: { paddingVertical: 6, paddingHorizontal: 12 },
+  deadName: { color: '#555', fontSize: 14, textDecorationLine: 'line-through' },
+  whisperBanner: { color: '#a78bfa', fontStyle: 'italic', textAlign: 'center', marginBottom: 12, fontSize: 14 },
 });
