@@ -34,6 +34,12 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
             actions_by_role.setdefault(player.role, []).append((player, action))
 
     # ── 1. Warden ─────────────────────────────────────────────────────────
+    # First, record old targets and clear them so Wardens who skip have it reset
+    wardens = [p for p in room.players.values() if p.role == RoleType.WARDEN and p.is_alive]
+    old_warden_targets = {p.user_id: p.last_protected_target for p in wardens}
+    for p in wardens:
+        p.last_protected_target = None
+
     for player, action in actions_by_role.get(RoleType.WARDEN, []):
         target_id = action.get("target")
         if not target_id:
@@ -42,7 +48,7 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
         if not target or not target.is_alive:
             continue
         # Cannot protect same target consecutively
-        if player.last_protected_target == target_id:
+        if old_warden_targets.get(player.user_id) == target_id:
             events.append({
                 "event": "warden_blocked",
                 "recipient": player.user_id,
@@ -182,6 +188,14 @@ def resolve_night(room: GameRoom) -> list[dict[str, Any]]:
             "target_name": death["target_name"],
             "source": death["source"],
             "message": f"{death['target_name']} was found dead at dawn.",
+        })
+
+    # If nobody died, announce a peaceful night
+    if not deaths:
+        events.append({
+            "event": "no_deaths",
+            "public": True,
+            "message": "No one was killed last night.",
         })
 
     room.night_log = events

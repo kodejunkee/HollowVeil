@@ -41,7 +41,7 @@ WS_URL = "ws://localhost:8000"
 # Valid values: "seer", "warden", "hunter", "necromancer", "vampire",
 #               "jester", "cursed_villager", "villager"
 # Set to None for normal random assignment.
-FORCE_PLAYER_ROLE = "necromancer"
+FORCE_PLAYER_ROLE = "cursed_villager"
 
 import jwt
 import os
@@ -136,6 +136,7 @@ class BotClient:
 
         elif msg_type == "phase_changed":
             phase = data.get("phase")
+            self.round = data.get("round", 1)
             logger.info(f"[{self.name}] Phase changed to: {phase}")
             
             if phase == "night" and self.alive:
@@ -241,12 +242,12 @@ class BotClient:
 async def create_room(token: str) -> str:
     # Use httpx to call the REST endpoint to create a room
     headers = {"Authorization": f"Bearer {token}"}
-    url = f"{SERVER_URL}/api/rooms/quickplay?token={token}"
+    url = f"{SERVER_URL}/api/rooms?token={token}"
     
     while True:
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.post(url)
+                resp = await client.post(url, json={"is_private": False})
                 resp.raise_for_status()
                 data = resp.json()
                 logger.info(f"Room ready: {data['room_id']} (Code: {data['room_code']})")
@@ -259,8 +260,8 @@ async def create_room(token: str) -> str:
 async def main():
     logger.info("Starting bot simulation...")
     
-    # Needs 8 players to start. We'll spawn 7 bots, so the user can be the 8th!
-    num_bots = 7
+    # We'll spawn 11 bots, so the user can be the 12th!
+    num_bots = 11
     
     host_id = generate_user_id()
     host_token = generate_token(host_id, "Bot-1")
@@ -284,7 +285,7 @@ async def main():
     # Give everyone time to connect and ready up
     logger.info("Waiting for the real player to join the lobby...")
     bot_ids = {b.user_id for b in bots}
-    while len(bots[0].players) < 8:
+    while len(bots[0].players) < 12:
         await asyncio.sleep(1)
     
     # Identify the real player (the one who isn't a bot)
@@ -308,7 +309,7 @@ async def main():
     # Wait for the real player to ready up
     logger.info("Waiting for all players to be ready...")
     while True:
-        all_ready = len(bots[0].player_ready) >= 8 and all(bots[0].player_ready.values())
+        all_ready = len(bots[0].player_ready) >= 12 and all(bots[0].player_ready.values())
         if all_ready:
             break
         await asyncio.sleep(1)

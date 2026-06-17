@@ -12,7 +12,7 @@ export default function LobbyScreen() {
   const [loading, setLoading] = useState(true);
   const params = useLocalSearchParams();
 
-  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.79.158.13:8000';
+  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.103.2.13:8000';
 
   useEffect(() => {
     let mounted = true;

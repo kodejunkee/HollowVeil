@@ -50,19 +50,15 @@ def check_win(room: GameRoom) -> dict[str, Any] | None:
 
     alive_factions = _faction_census(alive)
 
-    # ── Werewolf solo win ─────────────────────────────────────────────────
-    # Werewolf wins by being the last player alive
-    if len(alive) == 1 and alive[0].role == RoleType.WEREWOLF:
+    # ── Werewolf win ──────────────────────────────────────────────────────
+    # Werewolf wins by being the last player alive, or in a 1v1 against any opponent.
+    werewolves_alive = [p for p in alive if p.role == RoleType.WEREWOLF]
+    if werewolves_alive and len(alive) <= 2:
         return {
             "winner": "werewolf",
-            "message": "The Werewolf is the last one standing and wins!",
-            "winners": [alive[0].user_id],
+            "message": "The Werewolf has overpowered the last survivors and wins!",
+            "winners": [w.user_id for w in werewolves_alive],
         }
-
-    # Also check: if only werewolf + one other remain, werewolf can still
-    # kill that person next night, but the game isn't over yet — unless
-    # the remaining non-werewolf is a vampire (coven parity would trigger).
-    # We'll keep it simple: werewolf only wins at 1 alive.
 
     num_vampires = alive_factions.get(Faction.COVEN, 0)
     num_werewolves = alive_factions.get(Faction.WEREWOLF, 0)

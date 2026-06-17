@@ -390,7 +390,21 @@ class MessageHandler:
 
             await asyncio.sleep(settings.EXECUTION_DURATION)
         else:
-            await asyncio.sleep(3)
+            # No execution — broadcast the reason so the UI can display it
+            room.set_phase(GamePhase.EXECUTION)
+
+            await self.mgr.broadcast(room.room_id, {
+                "type": "execution_result",
+                "event": "no_execution",
+                "message": result.get("message", "No one was executed."),
+            })
+
+            await self.mgr.broadcast(room.room_id, {
+                "type": "phase_changed",
+                "phase": GamePhase.EXECUTION.value,
+            })
+
+            await asyncio.sleep(5)
 
         # Next night
         await self._start_night(room)

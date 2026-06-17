@@ -5,7 +5,7 @@ import PlayerList from './PlayerList';
 import { wsClient } from '../services/websocket';
 
 export default function NightActionPanel() {
-  const { myRole, players, myUserId, isAlive, round, covenMateIds, hasRevived, nonRevivableIds } = useGameStore();
+  const { myRole, players, myUserId, isAlive, round, covenMateIds, hasRevived, nonRevivableIds, myArrows, lastProtectedTargetId } = useGameStore();
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
@@ -51,11 +51,11 @@ export default function NightActionPanel() {
   }
 
   // ── GUARD: Hunter no arrows left ──
-  if (myRole === 'HUNTER' && me?.arrows !== undefined && me.arrows <= 0) {
+  if (myRole === 'HUNTER' && myArrows !== null && myArrows <= 0) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Night Phase</Text>
-        <Text style={styles.message}>🏹 You have no arrows remaining. Waiting for dawn...</Text>
+        <Text style={styles.message}>🏹 You have used all your arrows. Waiting for dawn...</Text>
       </View>
     );
   }
@@ -80,7 +80,7 @@ export default function NightActionPanel() {
         // Filter out self and coven-mates (server sends coven_mate_ids on role assignment)
         return players.filter(p => p.user_id !== myUserId && p.is_alive && !covenMateIds.includes(p.user_id));
       case 'WARDEN':
-        // Can protect self or other alive players
+        // Can protect self or other alive players (previously protected target is disabled in UI)
         return players.filter(p => p.is_alive);
       case 'NECROMANCER':
         // Only dead players, excluding non-revivable targets (dead vampires)
@@ -112,6 +112,14 @@ export default function NightActionPanel() {
     if (myRole === 'NECROMANCER') {
       useGameStore.setState({ hasRevived: true });
     }
+    // Decrement hunter's arrows locally so they can't shoot again if they hit 0
+    if (myRole === 'HUNTER') {
+      useGameStore.setState((state) => ({ myArrows: (state.myArrows || 0) - 1 }));
+    }
+    // Update local protected target so it cycles to lastProtectedTargetId on DAWN
+    if (myRole === 'WARDEN') {
+      useGameStore.setState({ currentNightTargetId: selectedTarget });
+    }
     setSubmitted(true);
   };
 
@@ -121,7 +129,7 @@ export default function NightActionPanel() {
       case 'SEER': return '🔮 Choose a player to investigate:';
       case 'VAMPIRE': return '🧛 Choose a target for the Coven kill:';
       case 'WEREWOLF': return '🐺 Choose a player to maul:';
-      case 'HUNTER': return `🏹 Choose a target to shoot (${me?.arrows ?? '?'} arrow${(me?.arrows ?? 0) !== 1 ? 's' : ''} left):`;
+      case 'HUNTER': return `🏹 Choose a target to shoot (${myArrows ?? '?'} arrow${(myArrows ?? 0) !== 1 ? 's' : ''} left):`;
       case 'WARDEN': return '🛡️ Choose a player to protect:';
       case 'NECROMANCER': return '💀 Choose a dead player to revive:';
       default: return 'Select a target:';
@@ -149,6 +157,7 @@ export default function NightActionPanel() {
         selectedId={selectedTarget} 
         onSelect={setSelectedTarget}
         allowSelectDead={myRole === 'NECROMANCER'}
+        disabledTargetIds={myRole === 'WARDEN' && lastProtectedTargetId ? [lastProtectedTargetId] : []}
       />
       <TouchableOpacity 
         style={[styles.submitBtn, !selectedTarget && styles.disabledBtn]} 

@@ -99,6 +99,7 @@ class Player:
             "arrows": self.arrows if self.role == RoleType.HUNTER else None,
             "has_revived": self.has_revived if self.role == RoleType.NECROMANCER else None,
             "has_final_whisper": self.has_final_whisper if self.role == RoleType.NECROMANCER else None,
+            "last_protected_target": self.last_protected_target if self.role == RoleType.WARDEN else None,
         }
 
     def to_public_dict(self) -> dict[str, Any]:

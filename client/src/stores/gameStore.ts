@@ -23,6 +23,9 @@ interface GameState {
   hasRevived: boolean;
   nonRevivableIds: string[];
   hasFinalWhisper: boolean;
+  myArrows: number | null;
+  lastProtectedTargetId: string | null;
+  currentNightTargetId: string | null;
   
   setUserId: (id: string) => void;
   setRoom: (id: string, code: string | null) => void;
@@ -54,6 +57,9 @@ export const useGameStore = create<GameState>((set) => ({
   hasRevived: false,
   nonRevivableIds: [],
   hasFinalWhisper: false,
+  myArrows: null,
+  lastProtectedTargetId: null,
+  currentNightTargetId: null,
 
   setUserId: (id) => set({ myUserId: id }),
   setRoom: (id, code) => set({ roomId: id, roomCode: code }),
@@ -76,22 +82,30 @@ export const useGameStore = create<GameState>((set) => ({
           isAlive: myPlayer ? myPlayer.is_alive : state.isAlive,
           myRole: myPlayer?.role ? myPlayer.role.toUpperCase() : state.myRole,
           timeRemaining: payload.remaining_seconds || state.timeRemaining,
+          myArrows: myPlayer?.arrows ?? state.myArrows,
+          lastProtectedTargetId: myPlayer?.last_protected_target ?? state.lastProtectedTargetId,
+          currentNightTargetId: state.phase === 'NIGHT' ? state.currentNightTargetId : null,
         };
       }
       case 'phase_changed':
+        const isDawn = payload.phase.toUpperCase() === 'DAWN';
         return { 
           phase: payload.phase.toUpperCase(), 
           round: payload.round || state.round,
           timeRemaining: payload.duration || 0,
           voteCounts: {}, // reset votes on phase change
           votesCast: 0,
-          dawnEvents: payload.phase.toUpperCase() === 'DAWN' ? state.dawnEvents : []
+          dawnEvents: isDawn ? state.dawnEvents : [],
+          lastProtectedTargetId: isDawn ? state.currentNightTargetId : state.lastProtectedTargetId,
+          currentNightTargetId: isDawn ? null : state.currentNightTargetId
         };
       case 'role_assigned':
         return { 
           myRole: payload.role ? payload.role.toUpperCase() : null,
           covenMateIds: payload.coven_mate_ids || [],
           hasFinalWhisper: payload.role?.toUpperCase() === 'NECROMANCER',
+          myArrows: payload.role?.toUpperCase() === 'HUNTER' ? 2 : null,
+          lastProtectedTargetId: null,
         };
       case 'chat_message': 
         return { 
@@ -112,6 +126,8 @@ export const useGameStore = create<GameState>((set) => ({
             (payload.event === 'death' && payload.target === state.myUserId) ? false : 
             (payload.event === 'necromancer_revive' && payload.target === state.myUserId) ? true :
             state.isAlive,
+          myRole:
+            (payload.event === 'cursed_transform') ? 'WEREWOLF' : state.myRole,
           players: state.players.map(p => {
             if (payload.event === 'death' && p.user_id === payload.target) return { ...p, is_alive: false };
             if (payload.event === 'necromancer_revive' && p.user_id === payload.target) return { ...p, is_alive: true };
@@ -166,5 +182,8 @@ export const useGameStore = create<GameState>((set) => ({
     hasRevived: false,
     nonRevivableIds: [],
     hasFinalWhisper: false,
+    myArrows: null,
+    lastProtectedTargetId: null,
+    currentNightTargetId: null,
   })
 }));
