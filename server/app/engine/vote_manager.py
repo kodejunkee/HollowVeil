@@ -51,7 +51,7 @@ def cast_vote(
             return {"success": False, "error": "Invalid vote target."}
         if not target.is_alive:
             return {"success": False, "error": "Cannot vote for a dead player."}
-        if target_id == voter_id:
+        if target_id == voter_id and voter.role != RoleType.JESTER:
             return {"success": False, "error": "You cannot vote for yourself."}
 
     room.votes[voter_id] = target_id

@@ -40,8 +40,8 @@ WS_URL = "ws://localhost:8000"
 #
 # Valid values: "seer", "warden", "hunter", "necromancer", "vampire",
 #               "jester", "cursed_villager", "villager"
-# Set to None for normal random assignment.
-FORCE_PLAYER_ROLE = "cursed_villager"
+# Set this to force the real player to have a specific role for testing
+FORCE_PLAYER_ROLE = None
 
 import jwt
 import os

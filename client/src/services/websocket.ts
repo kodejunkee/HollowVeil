@@ -62,6 +62,11 @@ export class GameWebSocket {
   }
 
   private attemptReconnect() {
+    if (this.maxReconnectAttempts === 0) {
+      console.log('Intentional disconnect, skipping reconnect.');
+      return;
+    }
+    
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const backoffTime = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);

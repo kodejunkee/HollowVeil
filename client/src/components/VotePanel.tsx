@@ -12,8 +12,8 @@ export default function VotePanel() {
   // Can this player vote?
   const canVote = isAlive || (myRole === 'NECROMANCER' && hasFinalWhisper);
 
-  // Build selectable targets: alive players, excluding self
-  const selectablePlayers = players.filter(p => p.is_alive && p.user_id !== myUserId);
+  // Build selectable targets: alive players, excluding self (unless Jester)
+  const selectablePlayers = players.filter(p => p.is_alive && (p.user_id !== myUserId || myRole === 'JESTER'));
 
   // Dead players for display context (non-interactive)
   const deadPlayers = players.filter(p => !p.is_alive);

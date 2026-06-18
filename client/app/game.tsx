@@ -20,6 +20,9 @@ export default function GameScreen() {
 
   useEffect(() => {
     wsClient.onMessage = (msg) => {
+      if (msg.type === 'error') {
+        alert(msg.message); // simple alert for web/native fallback
+      }
       updateState(msg);
     };
   }, []);
@@ -89,8 +92,8 @@ export default function GameScreen() {
               style={styles.homeBtn}
               onPress={() => {
                 wsClient.disconnect();
-                reset();
                 router.replace('/');
+                setTimeout(() => reset(), 100);
               }}
             >
               <Text style={styles.homeBtnText}>Return to Home</Text>

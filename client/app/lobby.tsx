@@ -75,7 +75,7 @@ export default function LobbyScreen() {
 
   const handleLeave = () => {
     wsClient.disconnect();
-    reset();
+    useGameStore.setState({ phase: 'LOBBY' });
     router.replace('/');
   };
 

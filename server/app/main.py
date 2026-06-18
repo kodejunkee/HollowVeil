@@ -145,9 +145,6 @@ async def api_join_room(req: JoinRoomRequest, token: str = Query(...)):
 
     room = get_room_by_code(req.room_code)
     if not room:
-        with open("join_debug.log", "a") as f:
-            from .room_registry import _rooms_by_code
-            f.write(f"ROOM NOT FOUND. Current rooms: {list(_rooms_by_code.keys())}\n")
         raise HTTPException(status_code=404, detail="Room not found")
     
     with open("join_debug.log", "a") as f:
