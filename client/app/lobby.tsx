@@ -16,7 +16,7 @@ export default function LobbyScreen() {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.133.42.13:8000';
+  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'https://hollowveil-api.onrender.com';
 
   useEffect(() => {
     let mounted = true;
