@@ -114,7 +114,14 @@ class GameRoom:
 
     def remove_player(self, user_id: str) -> Player | None:
         """Remove and return a player, or None if not found."""
-        return self.players.pop(user_id, None)
+        player = self.players.pop(user_id, None)
+        if player and self.host_user_id == user_id:
+            # Reassign host if there are remaining players
+            if self.players:
+                self.host_user_id = next(iter(self.players.keys()))
+            else:
+                self.host_user_id = ""
+        return player
 
     def get_player(self, user_id: str) -> Player | None:
         return self.players.get(user_id)
@@ -191,6 +198,7 @@ class GameRoom:
             "player_count": self.player_count,
             "players": [p.to_public_dict() for p in self.players.values()],
             "phase": self.phase.value,
+            "is_quick_play": getattr(self, 'is_quick_play', False),
         }
 
     def game_state_for(self, user_id: str) -> dict[str, Any]:

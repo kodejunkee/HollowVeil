@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../src/services/supabase';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,25 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleAuth = async () => {
     setLoading(true);
@@ -27,7 +47,7 @@ export default function LoginScreen() {
           options: { data: { display_name: displayName } }
         });
         if (error) throw error;
-        alert('Signup successful! Check email or just login if auto-confirm is off.');
+        alert('Signup successful! Check email or login.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -41,83 +61,160 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.layout}>
-        {/* Left side - Branding */}
-        <View style={styles.brandingSide}>
-          <Text style={styles.title}>HollowVeil</Text>
-          <Text style={styles.tagline}>Deception in the Dark</Text>
-        </View>
+    <LinearGradient colors={['#07040a', '#120a21', '#050308']} style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <Animated.View style={[styles.layout, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+          {/* Left side - Branding */}
+          <View style={styles.brandingSide}>
+            <Text style={styles.title}>HollowVeil</Text>
+            <View style={styles.titleDivider} />
+            <Text style={styles.tagline}>DECEPTION IN THE DARK</Text>
+          </View>
 
-        {/* Right side - Auth Form */}
-        <View style={styles.formSide}>
-          <View style={styles.formCard}>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {/* Right side - Auth Form */}
+          <View style={styles.formSide}>
+            <LinearGradient colors={['rgba(25, 20, 38, 0.85)', 'rgba(12, 10, 20, 0.95)']} style={styles.formCard}>
+              <Text style={styles.cardHeader}>{isSignUp ? 'JOIN THE VEIL' : 'ENTER THE LOBBY'}</Text>
+              
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#666"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-            />
-            
-            {isSignUp && (
               <TextInput
                 style={styles.input}
-                placeholder="Display Name"
-                placeholderTextColor="#666"
-                value={displayName}
-                onChangeText={setDisplayName}
+                placeholder="Email Address"
+                placeholderTextColor="#665a78"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
               />
-            )}
+              
+              {isSignUp && (
+                <TextInput
+                  style={styles.input}
+                  placeholder="Display Name"
+                  placeholderTextColor="#665a78"
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                />
+              )}
 
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={styles.passwordInput}
-                placeholder="Password"
-                placeholderTextColor="#666"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
-                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#666" />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Password"
+                  placeholderTextColor="#665a78"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#d4af37" />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={styles.buttonWrapper} activeOpacity={0.8} onPress={handleAuth} disabled={loading}>
+                <LinearGradient colors={['#d4af37', '#997a20']} style={styles.button}>
+                  {loading ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <Text style={styles.buttonText}>{isSignUp ? 'CREATE ACCOUNT' : 'LOG IN'}</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
-            </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleAuth} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isSignUp ? 'Sign Up' : 'Sign In'}</Text>}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.switchButton} onPress={() => setIsSignUp(!isSignUp)}>
-              <Text style={styles.switchText}>
-                {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.switchButton} onPress={() => setIsSignUp(!isSignUp)}>
+                <Text style={styles.switchText}>
+                  {isSignUp ? 'Already registered? Log in here' : 'Need an account? Sign up now'}
+                </Text>
+              </TouchableOpacity>
+            </LinearGradient>
           </View>
-        </View>
-      </View>
-    </SafeAreaView>
+        </Animated.View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
-  layout: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
-  brandingSide: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingRight: 20 },
-  formSide: { flex: 1, justifyContent: 'center', paddingLeft: 20 },
-  title: { fontSize: 36, fontWeight: 'bold', color: '#e0e0e0' },
-  tagline: { fontSize: 16, color: '#7c3aed', marginTop: 8, fontStyle: 'italic' },
-  formCard: { backgroundColor: '#1a1a2e', padding: 20, borderRadius: 12, borderWidth: 1, borderColor: '#2a2a4a' },
-  input: { backgroundColor: '#0a0a0f', color: '#e0e0e0', padding: 12, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#2a2a4a' },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0a0a0f', borderRadius: 8, borderWidth: 1, borderColor: '#2a2a4a', marginBottom: 12 },
-  passwordInput: { flex: 1, color: '#e0e0e0', padding: 12 },
-  eyeIcon: { padding: 12 },
-  button: { backgroundColor: '#7c3aed', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 4 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  switchButton: { marginTop: 14, alignItems: 'center' },
-  switchText: { color: '#3b82f6', fontSize: 13 },
-  errorText: { color: '#dc2626', marginBottom: 12, textAlign: 'center', fontSize: 13 },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  layout: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 30 },
+  brandingSide: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingRight: 30 },
+  formSide: { flex: 1, justifyContent: 'center', paddingLeft: 10 },
+  title: {
+    fontFamily: 'Cinzel_700Bold',
+    fontSize: 42,
+    color: '#d4af37',
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 6,
+  },
+  titleDivider: {
+    height: 2,
+    width: 140,
+    backgroundColor: '#d4af37',
+    marginVertical: 12,
+    opacity: 0.6,
+  },
+  tagline: {
+    fontFamily: 'Cinzel_400Regular',
+    fontSize: 13,
+    color: '#a894c2',
+    letterSpacing: 4,
+  },
+  formCard: {
+    padding: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#3a2e50',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  cardHeader: {
+    fontFamily: 'Cinzel_700Bold',
+    fontSize: 18,
+    color: '#e5d9c5',
+    marginBottom: 20,
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  input: {
+    backgroundColor: 'rgba(10, 8, 16, 0.8)',
+    color: '#e0e0e0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#2e2640',
+    fontFamily: 'Cinzel_400Regular',
+    fontSize: 14,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 8, 16, 0.8)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2e2640',
+    marginBottom: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    color: '#e0e0e0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontFamily: 'Cinzel_400Regular',
+    fontSize: 14,
+  },
+  eyeIcon: { paddingRight: 14 },
+  buttonWrapper: { marginTop: 6, borderRadius: 8, overflow: 'hidden' },
+  button: { paddingVertical: 14, alignItems: 'center', borderRadius: 8 },
+  buttonText: { fontFamily: 'Cinzel_700Bold', color: '#0a0710', fontSize: 15, letterSpacing: 1 },
+  switchButton: { marginTop: 16, alignItems: 'center' },
+  switchText: { fontFamily: 'Cinzel_400Regular', color: '#a894c2', fontSize: 12 },
+  errorText: { color: '#ef4444', marginBottom: 14, textAlign: 'center', fontSize: 13, fontFamily: 'Cinzel_400Regular' },
 });

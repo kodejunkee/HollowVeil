@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useGameStore } from '../stores/gameStore';
 import PlayerList from './PlayerList';
 import { wsClient } from '../services/websocket';
@@ -12,78 +13,72 @@ export default function NightActionPanel() {
   // ── GUARD: Dead players see spectator view ──
   if (!isAlive) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Night Phase</Text>
-        <Text style={styles.spectatorText}>💀 You are dead. Watching from beyond the grave...</Text>
-      </View>
+      <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+        <Text style={styles.title}>NIGHT PHASE</Text>
+        <Text style={styles.spectatorText}>💀 You are deceased. Watching the shadows from beyond...</Text>
+      </LinearGradient>
     );
   }
 
   // ── GUARD: Roles with no night action ──
   if (myRole === 'VILLAGER' || myRole === 'CURSED_VILLAGER' || myRole === 'JESTER') {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Night Phase</Text>
-        <Text style={styles.message}>You have no actions tonight. Waiting for dawn...</Text>
-      </View>
+      <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+        <Text style={styles.title}>NIGHT PHASE</Text>
+        <Text style={styles.message}>Rest easy tonight. Waiting for the light of dawn...</Text>
+      </LinearGradient>
     );
   }
 
   // ── GUARD: Necromancer already used revive ──
-  const me = players.find(p => p.user_id === myUserId);
   if (myRole === 'NECROMANCER' && hasRevived) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Night Phase</Text>
+      <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+        <Text style={styles.title}>NIGHT PHASE</Text>
         <Text style={styles.message}>💀 Your power has been spent. The dead rest undisturbed tonight.</Text>
-      </View>
+      </LinearGradient>
     );
   }
 
   // ── GUARD: Hunter Night 1 restriction ──
   if (myRole === 'HUNTER' && round <= 1) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Night Phase</Text>
+      <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+        <Text style={styles.title}>NIGHT PHASE</Text>
         <Text style={styles.message}>🏹 You cannot fire on the first night. Waiting for dawn...</Text>
-      </View>
+      </LinearGradient>
     );
   }
 
   // ── GUARD: Hunter no arrows left ──
   if (myRole === 'HUNTER' && myArrows !== null && myArrows <= 0) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Night Phase</Text>
-        <Text style={styles.message}>🏹 You have used all your arrows. Waiting for dawn...</Text>
-      </View>
+      <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+        <Text style={styles.title}>NIGHT PHASE</Text>
+        <Text style={styles.message}>🏹 You have spent all your arrows. Waiting for dawn...</Text>
+      </LinearGradient>
     );
   }
 
   if (submitted) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.message}>Action submitted. Waiting for dawn...</Text>
-      </View>
+      <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+        <Text style={styles.successMessage}>✨ Action submitted to the shadows. Awaiting dawn...</Text>
+      </LinearGradient>
     );
   }
 
-  // ── Build valid target list based on role ──
   const getValidTargets = () => {
     switch (myRole) {
       case 'SEER':
       case 'HUNTER':
       case 'WEREWOLF':
-        // Can only target OTHER ALIVE players
         return players.filter(p => p.user_id !== myUserId && p.is_alive);
       case 'VAMPIRE':
-        // Filter out self and coven-mates (server sends coven_mate_ids on role assignment)
         return players.filter(p => p.user_id !== myUserId && p.is_alive && !covenMateIds.includes(p.user_id));
       case 'WARDEN':
-        // Can protect self or other alive players (previously protected target is disabled in UI)
         return players.filter(p => p.is_alive);
       case 'NECROMANCER':
-        // Only dead players, excluding non-revivable targets (dead vampires)
         return players.filter(p => !p.is_alive && !nonRevivableIds.includes(p.user_id));
       default:
         return [];
@@ -92,65 +87,51 @@ export default function NightActionPanel() {
 
   const targets = getValidTargets();
 
-  // Edge case: Necromancer with no dead players to revive
   if (targets.length === 0) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Night Phase</Text>
+      <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+        <Text style={styles.title}>NIGHT PHASE</Text>
         <Text style={styles.message}>No valid targets available. Waiting for dawn...</Text>
-      </View>
+      </LinearGradient>
     );
   }
 
   const handleSubmit = () => {
     if (!selectedTarget) return;
-    wsClient.send('action_submit', { 
-      action: 'use_ability', 
-      target_id: selectedTarget 
-    });
-    // Mark necromancer's revive as used immediately so UI won't show again
-    if (myRole === 'NECROMANCER') {
-      useGameStore.setState({ hasRevived: true });
-    }
-    // Decrement hunter's arrows locally so they can't shoot again if they hit 0
-    if (myRole === 'HUNTER') {
-      useGameStore.setState((state) => ({ myArrows: (state.myArrows || 0) - 1 }));
-    }
-    // Update local protected target so it cycles to lastProtectedTargetId on DAWN
-    if (myRole === 'WARDEN') {
-      useGameStore.setState({ currentNightTargetId: selectedTarget });
-    }
+    wsClient.send('action_submit', { action: 'use_ability', target_id: selectedTarget });
+    if (myRole === 'NECROMANCER') useGameStore.setState({ hasRevived: true });
+    if (myRole === 'HUNTER') useGameStore.setState((state) => ({ myArrows: (state.myArrows || 0) - 1 }));
+    if (myRole === 'WARDEN') useGameStore.setState({ currentNightTargetId: selectedTarget });
     setSubmitted(true);
   };
 
-  // Role-specific prompt text
   const getPromptText = () => {
     switch (myRole) {
-      case 'SEER': return '🔮 Choose a player to investigate:';
-      case 'VAMPIRE': return '🧛 Choose a target for the Coven kill:';
-      case 'WEREWOLF': return '🐺 Choose a player to maul:';
-      case 'HUNTER': return `🏹 Choose a target to shoot (${myArrows ?? '?'} arrow${(myArrows ?? 0) !== 1 ? 's' : ''} left):`;
-      case 'WARDEN': return '🛡️ Choose a player to protect:';
-      case 'NECROMANCER': return '💀 Choose a dead player to revive:';
+      case 'SEER': return '🔮 Select a target to scry:';
+      case 'VAMPIRE': return '🧛 Select a target for the Coven kill:';
+      case 'WEREWOLF': return '🐺 Select a target to maul:';
+      case 'HUNTER': return `🏹 Select a target to shoot (${myArrows ?? '?'} arrows left):`;
+      case 'WARDEN': return '🛡️ Select a target to protect:';
+      case 'NECROMANCER': return '💀 Select a fallen target to revive:';
       default: return 'Select a target:';
     }
   };
 
   const getActionLabel = () => {
     switch (myRole) {
-      case 'SEER': return '🔮 Scry';
-      case 'VAMPIRE': return '🧛 Bite';
-      case 'WEREWOLF': return '🐺 Maul';
-      case 'HUNTER': return '🏹 Shoot';
-      case 'WARDEN': return '🛡️ Protect';
-      case 'NECROMANCER': return '💀 Revive';
-      default: return 'Confirm';
+      case 'SEER': return '🔮 SCRY TARGET';
+      case 'VAMPIRE': return '🧛 BITE TARGET';
+      case 'WEREWOLF': return '🐺 MAUL TARGET';
+      case 'HUNTER': return '🏹 FIRE ARROW';
+      case 'WARDEN': return '🛡️ PROTECT TARGET';
+      case 'NECROMANCER': return '💀 REVIVE TARGET';
+      default: return 'CONFIRM ACTION';
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Night Action</Text>
+    <LinearGradient colors={['rgba(25, 20, 38, 0.95)', 'rgba(12, 10, 20, 0.98)']} style={styles.container}>
+      <Text style={styles.title}>NIGHT ABILITY</Text>
       <Text style={styles.prompt}>{getPromptText()}</Text>
       <PlayerList 
         players={targets} 
@@ -160,23 +141,33 @@ export default function NightActionPanel() {
         disabledTargetIds={myRole === 'WARDEN' && lastProtectedTargetId ? [lastProtectedTargetId] : []}
       />
       <TouchableOpacity 
-        style={[styles.submitBtn, !selectedTarget && styles.disabledBtn]} 
+        activeOpacity={0.8}
+        style={[styles.submitBtnWrapper, !selectedTarget && styles.disabledWrapper]} 
         onPress={handleSubmit}
         disabled={!selectedTarget}
       >
-        <Text style={styles.submitText}>{getActionLabel()}</Text>
+        <LinearGradient
+          colors={selectedTarget ? ['#d4af37', '#997a20'] : ['#2a2238', '#181320']}
+          style={styles.submitBtn}
+        >
+          <Text style={[styles.submitText, { color: selectedTarget ? '#0a0710' : '#665a78' }]}>
+            {getActionLabel()}
+          </Text>
+        </LinearGradient>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: '#1a1a2e', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#2a2a4a' },
-  title: { color: '#e0e0e0', fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  message: { color: '#aaa', fontStyle: 'italic', textAlign: 'center', marginVertical: 20 },
-  spectatorText: { color: '#666', fontStyle: 'italic', textAlign: 'center', marginVertical: 20, fontSize: 16 },
-  prompt: { color: '#e0e0e0', marginBottom: 10 },
-  submitBtn: { backgroundColor: '#7c3aed', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 15 },
-  disabledBtn: { backgroundColor: '#444' },
-  submitText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  container: { padding: 18, borderRadius: 12, borderWidth: 1, borderColor: '#3a2e50' },
+  title: { color: '#d4af37', fontSize: 18, fontFamily: 'Cinzel_700Bold', letterSpacing: 1, marginBottom: 8 },
+  message: { color: '#a894c2', fontFamily: 'Cinzel_400Regular', fontStyle: 'italic', textAlign: 'center', marginVertical: 20 },
+  successMessage: { color: '#10b981', fontFamily: 'Cinzel_700Bold', textAlign: 'center', marginVertical: 20, fontSize: 15 },
+  spectatorText: { color: '#8b80a0', fontFamily: 'Cinzel_400Regular', fontStyle: 'italic', textAlign: 'center', marginVertical: 20, fontSize: 14 },
+  prompt: { color: '#e5d9c5', fontFamily: 'Cinzel_400Regular', marginBottom: 10, fontSize: 13 },
+  submitBtnWrapper: { marginTop: 16, borderRadius: 8, overflow: 'hidden' },
+  disabledWrapper: { opacity: 0.5 },
+  submitBtn: { paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
+  submitText: { fontFamily: 'Cinzel_700Bold', fontSize: 14, letterSpacing: 1 },
 });

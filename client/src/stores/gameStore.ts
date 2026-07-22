@@ -5,6 +5,11 @@ interface GameState {
   round: number;
   players: any[];
   myRole: string | null;
+  myRoleName: string | null;
+  myRoleFaction: string | null;
+  myRoleDescription: string | null;
+  myRoleAbility: string | null;
+  myRolePassive: string | null;
   myUserId: string | null;
   isAlive: boolean;
   chatMessages: any[];
@@ -14,6 +19,7 @@ interface GameState {
   roomId: string | null;
   roomCode: string | null;
   isHost: boolean;
+  is_quick_play: boolean;
   dawnEvents: any[];
   timelineEvents: any[];
   gameOverData: any | null;
@@ -39,6 +45,11 @@ export const useGameStore = create<GameState>((set) => ({
   round: 0,
   players: [],
   myRole: null,
+  myRoleName: null,
+  myRoleFaction: null,
+  myRoleDescription: null,
+  myRoleAbility: null,
+  myRolePassive: null,
   myUserId: null,
   isAlive: true,
   chatMessages: [],
@@ -48,6 +59,7 @@ export const useGameStore = create<GameState>((set) => ({
   roomId: null,
   roomCode: null,
   isHost: false,
+  is_quick_play: true,
   dawnEvents: [],
   timelineEvents: [],
   gameOverData: null,
@@ -70,7 +82,9 @@ export const useGameStore = create<GameState>((set) => ({
       case 'lobby_update':
         return { 
           players: payload.players,
-          isHost: payload.host_id === state.myUserId
+          isHost: payload.host_user_id === state.myUserId,
+          roomCode: payload.room_code,
+          is_quick_play: payload.is_quick_play
         };
       case 'game_state': {
         // Reconnection sync — extract own alive status and role-specific fields
@@ -102,6 +116,11 @@ export const useGameStore = create<GameState>((set) => ({
       case 'role_assigned':
         return { 
           myRole: payload.role ? payload.role.toUpperCase() : null,
+          myRoleName: payload.role_name || null,
+          myRoleFaction: payload.faction || null,
+          myRoleDescription: payload.description || null,
+          myRoleAbility: payload.ability || null,
+          myRolePassive: payload.passive || null,
           covenMateIds: payload.coven_mate_ids || [],
           hasFinalWhisper: payload.role?.toUpperCase() === 'NECROMANCER',
           myArrows: payload.role?.toUpperCase() === 'HUNTER' ? 2 : null,

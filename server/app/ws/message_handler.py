@@ -243,6 +243,7 @@ class MessageHandler:
                 "faction": meta.get("faction_label", ""),
                 "description": meta.get("description", ""),
                 "ability": meta.get("ability", ""),
+                "passive": meta.get("passive", ""),
             }
             # Tell vampires who their coven-mates are
             if player.role == RoleType.VAMPIRE:
