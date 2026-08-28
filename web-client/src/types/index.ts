@@ -16,13 +16,12 @@ export interface ChatMessage {
   is_ghost?: boolean;
 }
 
-export enum GamePhase {
-  LOBBY = 'LOBBY',
-  ROLE_ASSIGNMENT = 'ROLE_ASSIGNMENT',
-  NIGHT = 'NIGHT',
-  DAWN = 'DAWN',
-  DISCUSSION = 'DISCUSSION',
-  VOTING = 'VOTING',
-  EXECUTION = 'EXECUTION',
-  GAME_OVER = 'GAME_OVER'
-}
+export type GamePhase = 
+  | 'LOBBY'
+  | 'ROLE_ASSIGNMENT'
+  | 'NIGHT'
+  | 'DAWN'
+  | 'DISCUSSION'
+  | 'VOTING'
+  | 'EXECUTION'
+  | 'GAME_OVER';
