@@ -8,7 +8,7 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/images/icons/HollowVeil-Title.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a0a0f"
     },

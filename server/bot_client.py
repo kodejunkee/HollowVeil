@@ -23,8 +23,8 @@ import websockets
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("bot")
 
-SERVER_URL = "http://localhost:8000"
-WS_URL = "ws://localhost:8000"
+SERVER_URL = "https://hollowveil-api.onrender.com"
+WS_URL = "wss://hollowveil-api.onrender.com"
 
 # ── Debug: Force the real player's role ───────────────────────────────
 # ⚠️  TEMPORARY — FOR TESTING ONLY

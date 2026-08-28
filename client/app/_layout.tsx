@@ -7,6 +7,7 @@ import { View, Text } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useFonts, Cinzel_400Regular, Cinzel_700Bold } from '@expo-google-fonts/cinzel';
 import * as SplashScreen from 'expo-splash-screen';
+import GlobalNetworkOverlay from '../src/components/GlobalNetworkOverlay';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -51,6 +52,7 @@ export default function RootLayout() {
         <Stack.Screen name="lobby" />
         <Stack.Screen name="game" />
       </Stack>
+      <GlobalNetworkOverlay />
     </SafeAreaProvider>
   );
 }

@@ -7,11 +7,13 @@ import { useAuthStore } from '../src/stores/authStore';
 import { wsClient } from '../src/services/websocket';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Network from 'expo-network';
 
 export default function LobbyScreen() {
   const { session } = useAuthStore();
   const { players, phase, updateState, myUserId, reset, isHost, lobbyCountdown, is_quick_play, roomCode } = useGameStore();
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const params = useLocalSearchParams();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -23,6 +25,12 @@ export default function LobbyScreen() {
 
     const connectToGame = async () => {
       try {
+        // 1. Check Internet First
+        const networkState = await Network.getNetworkStateAsync();
+        if (!networkState.isConnected || !networkState.isInternetReachable) {
+          throw new Error('Your device is currently offline. Please check your Wi-Fi or cellular data.');
+        }
+
         let roomId = '';
         if (params.mode === 'private' && params.code) {
            const res = await fetch(`${SERVER_URL}/api/rooms/join?token=${session.access_token}`, {
@@ -65,9 +73,14 @@ export default function LobbyScreen() {
 
         wsClient.connect(SERVER_URL, roomId, session.access_token);
         setLoading(false);
-      } catch (err) {
-        console.error(err);
-        if (mounted) setLoading(false);
+      } catch (err: any) {
+        console.error('Lobby connection error:', err);
+        if (mounted) {
+           const errorMsg = err.message.includes('Network request failed') 
+              ? 'Cannot reach the game servers. They might be offline.' 
+              : err.message;
+           setConnectionError(errorMsg);
+        }
       }
     };
 
@@ -106,14 +119,30 @@ export default function LobbyScreen() {
     router.replace('/');
   };
 
-  if (loading) {
+  if (loading || connectionError) {
     return (
       <LinearGradient colors={['#08050e', '#130a21', '#050308']} style={styles.container}>
         <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#d4af37" />
-          <Text style={{ color: '#d4af37', marginTop: 14, fontFamily: 'Cinzel_700Bold', fontSize: 16 }}>
-            CONNECTING TO CHAMBER...
-          </Text>
+          {connectionError ? (
+            <>
+              <MaterialCommunityIcons name="wifi-off" size={64} color="#dc2626" />
+              <Text style={{ color: '#dc2626', marginTop: 14, fontFamily: 'Cinzel_700Bold', fontSize: 16, textAlign: 'center', marginHorizontal: 40 }}>
+                {connectionError}
+              </Text>
+              <TouchableOpacity style={[styles.mainBtnWrapper, { marginTop: 30 }]} activeOpacity={0.7} onPress={() => router.replace('/')}>
+                <ImageBackground source={require('../assets/images/borders/main-button-1.png')} style={styles.mainBtnBg} resizeMode="stretch">
+                  <Text style={styles.mainBtnText}>RETURN HOME</Text>
+                </ImageBackground>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color="#d4af37" />
+              <Text style={{ color: '#d4af37', marginTop: 14, fontFamily: 'Cinzel_700Bold', fontSize: 16 }}>
+                CONNECTING TO CHAMBER...
+              </Text>
+            </>
+          )}
         </SafeAreaView>
       </LinearGradient>
     );
@@ -270,6 +299,13 @@ const styles = StyleSheet.create({
   myPlayerRow: { backgroundColor: 'rgba(212, 175, 55, 0.08)' },
   playerLeftInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   playerName: { color: '#e5d9c5', fontSize: 14, fontFamily: 'Cinzel_400Regular' },
+  kickBtnText: { color: '#dc2626', fontFamily: 'Cinzel_700Bold', fontSize: 11, marginLeft: 4 },
+  
+  // Re-used from index.tsx for the back button
+  mainBtnWrapper: { width: 220, height: 60, alignSelf: 'center' },
+  mainBtnBg: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  mainBtnText: { color: '#d4af37', fontFamily: 'Cinzel_700Bold', fontSize: 16, letterSpacing: 2 },
+
   myPlayerName: { color: '#d4af37', fontFamily: 'Cinzel_700Bold' },
   hostBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(212, 175, 55, 0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   hostBadgeText: { color: '#d4af37', fontSize: 10, fontFamily: 'Cinzel_700Bold' },

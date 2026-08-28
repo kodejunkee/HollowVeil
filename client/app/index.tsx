@@ -6,20 +6,61 @@ import { router } from 'expo-router';
 import { useAuthStore } from '../src/stores/authStore';
 import { useGameStore } from '../src/stores/gameStore';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Network from 'expo-network';
 
 export default function HomeScreen() {
   const { user, signOut } = useAuthStore();
   const { setUserId } = useGameStore();
   const [roomCode, setRoomCode] = useState('');
   const [privateModalState, setPrivateModalState] = useState<'none' | 'menu' | 'join'>('none');
+  
+  const [isConnecting, setIsConnecting] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'https://hollowveil-api.onrender.com';
 
   useEffect(() => {
     if (!user) {
       router.replace('/login');
     } else {
       setUserId(user.id);
+      pingServer();
     }
   }, [user]);
+
+  const pingServer = async () => {
+    try {
+      setIsConnecting(true);
+      setConnectionError(null);
+
+      // 1. Check if the device has an active internet connection first
+      const networkState = await Network.getNetworkStateAsync();
+      if (!networkState.isConnected || !networkState.isInternetReachable) {
+        throw new Error('Your device is currently offline. Please check your internet connection.');
+      }
+
+      // 2. Simple GET request to the root health endpoint to check if SERVER is alive
+      const res = await fetch(SERVER_URL);
+      if (!res.ok) throw new Error('Cannot reach the game servers. They might be down for maintenance.');
+      
+      // Success!
+      setIsConnecting(false);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }).start();
+    } catch (err: any) {
+      console.error("Ping failed:", err);
+      // If it's a fetch network error, it means the server is completely unreachable (not responding at all)
+      const errorMsg = err.message.includes('Network request failed') 
+        ? 'Cannot reach the game servers. They might be waking up or offline.' 
+        : err.message;
+        
+      setConnectionError(errorMsg);
+    }
+  };
 
   if (!user) return null;
 
@@ -50,8 +91,39 @@ export default function HomeScreen() {
       style={styles.container}
       resizeMode="cover"
     >
-      {/* PERFECTLY CENTERED ELEMENTS (Ignores notch padding to center with background) */}
-      <View style={[StyleSheet.absoluteFill, { zIndex: 10, elevation: 10 }]} pointerEvents="box-none">
+      {/* LOADING OVERLAY */}
+      {(isConnecting || connectionError) && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(5, 3, 8, 0.75)', justifyContent: 'center', alignItems: 'center', zIndex: 50 }]}>
+          {connectionError ? (
+            <>
+              <MaterialCommunityIcons name="wifi-off" size={64} color="#dc2626" />
+              <Text style={{ color: '#dc2626', marginTop: 14, fontFamily: 'Cinzel_700Bold', fontSize: 16, textAlign: 'center', marginHorizontal: 40 }}>
+                {connectionError}
+              </Text>
+              <TouchableOpacity style={[styles.mainBtnWrapper, { marginTop: 30 }]} activeOpacity={0.7} onPress={() => { setConnectionError(null); setIsConnecting(true); pingServer(); }}>
+                <ImageBackground source={require('../assets/images/borders/main-button-1.png')} style={styles.mainBtnBg} resizeMode="stretch">
+                  <Text style={styles.mainBtnText}>RETRY</Text>
+                </ImageBackground>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginTop: 20 }} onPress={handleSignOut}>
+                <Text style={{ color: '#888', fontWeight: 'bold' }}>SIGN OUT</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color="#d4af37" />
+              <Text style={{ color: '#d4af37', marginTop: 14, fontFamily: 'Cinzel_700Bold', fontSize: 16 }}>
+                CONNECTING TO SERVER...
+              </Text>
+            </>
+          )}
+        </View>
+      )}
+
+      {/* ALL UI ELEMENTS (Fades in when connected) */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]} pointerEvents={isConnecting || connectionError ? 'none' : 'auto'}>
+        {/* PERFECTLY CENTERED ELEMENTS (Ignores notch padding to center with background) */}
+        <View style={[StyleSheet.absoluteFill, { zIndex: 10, elevation: 10 }]} pointerEvents="box-none">
         {/* CENTER TOP: TITLE */}
         <View style={styles.titleContainer}>
           <Image
@@ -199,7 +271,7 @@ export default function HomeScreen() {
                         <Text style={styles.modalBtnText}>CANCEL</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.modalBtnJoin} activeOpacity={0.7} onPress={handleJoinPrivate}>
-                        <Text style={[styles.modalBtnText, { color: '#000' }]}>JOIN</Text>
+                        <Text style={styles.modalBtnText}>JOIN</Text>
                       </TouchableOpacity>
                     </View>
                   </>
@@ -209,8 +281,8 @@ export default function HomeScreen() {
             </View>
           </Modal>
         )}
-
       </SafeAreaView>
+      </Animated.View>
     </ImageBackground>
   );
 }
