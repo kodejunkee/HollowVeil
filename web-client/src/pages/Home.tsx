@@ -86,13 +86,13 @@ export default function Home() {
           <CardContent>
             <form onSubmit={handleJoinRoom} className="flex gap-2">
               <Input
-                placeholder="Room Code (e.g. ABCD)"
+                placeholder="Room Code (e.g. XXXXXX)"
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                maxLength={4}
+                maxLength={6}
                 className="font-mono text-center uppercase"
               />
-              <Button type="submit" disabled={loading || roomCode.length < 4}>
+              <Button type="submit" disabled={loading || roomCode.length < 6}>
                 Join
               </Button>
             </form>
