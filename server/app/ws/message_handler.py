@@ -272,14 +272,20 @@ class MessageHandler:
             await self.mgr.send_personal(room.room_id, uid, role_msg)
 
         # Broadcast phase change
+        room.set_phase(GamePhase.ROLE_ASSIGNMENT, 10)
         await self.mgr.broadcast(room.room_id, {
             "type": "phase_changed",
             "phase": GamePhase.ROLE_ASSIGNMENT.value,
+            "duration": 10,
         })
 
-        # Wait a few seconds for players to read their role, then start night
-        await asyncio.sleep(5)
-        await self._start_night(room)
+        # 10 second countdown for players to read their role, then start night
+        room.cancel_phase_task()
+        room._phase_task = await start_phase_timer(
+            room.room_id,
+            10,
+            lambda: self._start_night(room),
+        )
 
     async def _start_night(self, room: GameRoom) -> None:
         room.begin_night()
@@ -332,9 +338,11 @@ class MessageHandler:
                     {"type": "dawn_event", **event},
                 )
 
+        room.set_phase(GamePhase.DAWN, 10)
         await self.mgr.broadcast(room.room_id, {
             "type": "phase_changed",
             "phase": GamePhase.DAWN.value,
+            "duration": 10,
         })
 
         # Check win condition after night deaths
@@ -343,9 +351,13 @@ class MessageHandler:
             await self._end_game(room, win)
             return
 
-        # Pause at dawn for 5 seconds, then discussion
-        await asyncio.sleep(5)
-        await self._start_discussion(room)
+        # 10 second countdown for dawn announcements, then discussion
+        room.cancel_phase_task()
+        room._phase_task = await start_phase_timer(
+            room.room_id,
+            10,
+            lambda: self._start_discussion(room),
+        )
 
     async def _start_discussion(self, room: GameRoom) -> None:
         room.set_phase(GamePhase.DISCUSSION, settings.DISCUSSION_DURATION)
@@ -389,8 +401,9 @@ class MessageHandler:
             **result,
         })
 
+        room.set_phase(GamePhase.EXECUTION, 10)
+
         if result["outcome"] == "execution":
-            room.set_phase(GamePhase.EXECUTION)
             exec_result = vote_manager.execute_player(room, result["executed_id"])
 
             await self.mgr.broadcast(room.room_id, {
@@ -401,6 +414,7 @@ class MessageHandler:
             await self.mgr.broadcast(room.room_id, {
                 "type": "phase_changed",
                 "phase": GamePhase.EXECUTION.value,
+                "duration": 10,
             })
 
             # Check win condition after execution
@@ -409,12 +423,8 @@ class MessageHandler:
                 await asyncio.sleep(3)
                 await self._end_game(room, win)
                 return
-
-            await asyncio.sleep(settings.EXECUTION_DURATION)
         else:
             # No execution — broadcast the reason so the UI can display it
-            room.set_phase(GamePhase.EXECUTION)
-
             await self.mgr.broadcast(room.room_id, {
                 "type": "execution_result",
                 "event": "no_execution",
@@ -424,12 +434,16 @@ class MessageHandler:
             await self.mgr.broadcast(room.room_id, {
                 "type": "phase_changed",
                 "phase": GamePhase.EXECUTION.value,
+                "duration": 10,
             })
 
-            await asyncio.sleep(5)
-
-        # Next night
-        await self._start_night(room)
+        # 10 second countdown for execution announcement, then next night
+        room.cancel_phase_task()
+        room._phase_task = await start_phase_timer(
+            room.room_id,
+            10,
+            lambda: self._start_night(room),
+        )
 
     async def _end_game(self, room: GameRoom, win: dict[str, Any]) -> None:
         """Broadcast victory and reveal all roles."""
