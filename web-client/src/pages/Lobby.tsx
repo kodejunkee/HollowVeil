@@ -15,27 +15,6 @@ export default function Lobby() {
   const { session, user } = useAuthStore();
   const { players, isHost, roomCode, wsStatus, setRoom, lobbyCountdown, setUserId } = useGameStore();
 
-  useEffect(() => {
-    if (!roomId || !session?.access_token || !user?.id) return;
-    
-    setUserId(user.id);
-    const serverUrl = import.meta.env.VITE_API_URL || 'https://hollowveil-api.onrender.com';
-    setRoom(roomId, null);
-    
-    wsClient.connect(serverUrl, roomId, session.access_token);
-
-    wsClient.onMessage = (data) => {
-      useGameStore.getState().updateState(data);
-      if (data.type === 'game_state' && data.phase !== 'LOBBY') {
-        navigate(`/game/${roomId}`);
-      }
-    };
-
-    return () => {
-      wsClient.disconnect();
-    };
-  }, [roomId, session?.access_token, user?.id]);
-
   const handleStartGame = () => {
     wsClient.send('lobby_start');
   };
@@ -49,8 +28,7 @@ export default function Lobby() {
   };
 
   const handleLeave = () => {
-    wsClient.disconnect();
-    useGameStore.setState({ phase: 'LOBBY' });
+    useGameStore.getState().reset();
     navigate('/');
   };
 

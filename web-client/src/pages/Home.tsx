@@ -24,7 +24,7 @@ export default function Home() {
       });
       if (!res.ok) throw new Error('Failed to create room');
       const data = await res.json();
-      navigate(`/lobby/${data.room_id}`);
+      navigate(`/room/${data.room_id}`);
     } catch (err) {
       console.error(err);
       alert('Failed to create room.');
@@ -45,7 +45,7 @@ export default function Home() {
       });
       if (!res.ok) throw new Error('Room not found or full');
       const data = await res.json();
-      navigate(`/lobby/${data.room_id}`);
+      navigate(`/room/${data.room_id}`);
     } catch (err: any) {
       alert(err.message);
     } finally {

@@ -9,12 +9,6 @@ export default function Game() {
   const navigate = useNavigate();
   const { phase, round, timeRemaining, isAlive, myRoleName } = useGameStore();
 
-  useEffect(() => {
-    if (phase === 'LOBBY') {
-      navigate(`/lobby/${roomId}`);
-    }
-  }, [phase, roomId, navigate]);
-
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       <header className="flex items-center justify-between p-4 border-b bg-card z-10 shrink-0">
