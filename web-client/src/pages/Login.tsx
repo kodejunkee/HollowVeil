@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,16 @@ export default function Login() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        if (!displayName.trim()) throw new Error('Display name is required');
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: {
+              display_name: displayName.trim()
+            }
+          }
+        });
         if (error) throw error;
       }
     } catch (err: any) {
@@ -42,6 +52,19 @@ export default function Login() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Display Name</label>
+                <Input
+                  type="text"
+                  placeholder="Username"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required={!isLogin}
+                  maxLength={15}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
               <Input
