@@ -7,6 +7,8 @@ import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Users, Play, LogOut, Check, X } from 'lucide-react';
 
+import { ChatPanel } from '../components/game/ChatPanel';
+
 export default function Lobby() {
   const { roomId } = useParams();
   const navigate = useNavigate();
@@ -55,7 +57,7 @@ export default function Lobby() {
   const readyCount = players.filter(p => p.is_ready).length;
 
   return (
-    <div className="flex flex-col min-h-screen p-4 max-w-4xl mx-auto w-full">
+    <div className="flex flex-col min-h-screen p-4 max-w-5xl mx-auto w-full">
       {lobbyCountdown !== null && (
         <div className="bg-destructive text-destructive-foreground p-3 rounded-md mb-4 text-center font-bold tracking-widest animate-pulse">
           GAME BEGINNING IN {lobbyCountdown}s...
@@ -139,6 +141,10 @@ export default function Lobby() {
               )}
             </CardContent>
           </Card>
+          
+          <div className="h-[400px]">
+            <ChatPanel />
+          </div>
         </div>
       </div>
     </div>
