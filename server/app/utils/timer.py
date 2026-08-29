@@ -62,7 +62,10 @@ async def run_phase_timer(
         })
 
         # Phase expired — invoke callback
-        await on_expire()
+        try:
+            await on_expire()
+        except Exception:
+            logger.exception("Error in phase timer callback for room=%s", room_id)
 
     except asyncio.CancelledError:
         logger.debug("Phase timer cancelled for room=%s", room_id)

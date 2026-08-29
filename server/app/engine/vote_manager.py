@@ -198,15 +198,10 @@ def get_vote_status(room: GameRoom) -> dict[str, Any]:
     alive_count = len(room.alive_players)
     voted_count = len(room.votes)
 
-    # Count per target (anonymised counts only)
+    # Count per target (keyed by target_id or "skip")
     counts: dict[str, int] = {}
     for target_id in room.votes.values():
-        if target_id == SKIP_VOTE:
-            counts["skip"] = counts.get("skip", 0) + 1
-        else:
-            target = room.get_player(target_id)
-            name = target.display_name if target else target_id
-            counts[name] = counts.get(name, 0) + 1
+        counts[target_id] = counts.get(target_id, 0) + 1
 
     return {
         "total_alive": alive_count,

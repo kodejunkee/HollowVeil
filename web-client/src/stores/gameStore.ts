@@ -32,11 +32,15 @@ interface GameState {
   myArrows: number | null;
   lastProtectedTargetId: string | null;
   currentNightTargetId: string | null;
+  myVoteTargetId: string | null;
+  actionConfirmedMessage: string | null;
   wsStatus: 'disconnected' | 'connected' | 'reconnecting';
   
   setUserId: (id: string) => void;
   setWsStatus: (status: 'disconnected' | 'connected' | 'reconnecting') => void;
   setRoom: (id: string, code: string | null) => void;
+  setCurrentNightTargetId: (id: string | null) => void;
+  setMyVoteTargetId: (id: string | null) => void;
   updateState: (payload: any) => void;
   clearDawnEvents: () => void;
   reset: () => void;
@@ -74,11 +78,15 @@ export const useGameStore = create<GameState>((set) => ({
   myArrows: null,
   lastProtectedTargetId: null,
   currentNightTargetId: null,
+  myVoteTargetId: null,
+  actionConfirmedMessage: null,
   wsStatus: 'disconnected',
 
   setUserId: (id) => set({ myUserId: id }),
   setWsStatus: (status) => set({ wsStatus: status }),
   setRoom: (id, code) => set({ roomId: id, roomCode: code }),
+  setCurrentNightTargetId: (id) => set({ currentNightTargetId: id }),
+  setMyVoteTargetId: (id) => set({ myVoteTargetId: id }),
   clearDawnEvents: () => set({ dawnEvents: [] }),
   
   updateState: (payload) => set((state) => {
@@ -106,16 +114,24 @@ export const useGameStore = create<GameState>((set) => ({
         };
       }
       case 'phase_changed':
-        const isDawn = payload.phase.toUpperCase() === 'DAWN';
+        const nextPhase = payload.phase.toUpperCase();
+        const isDawn = nextPhase === 'DAWN';
+        const isNight = nextPhase === 'NIGHT';
         return { 
-          phase: payload.phase.toUpperCase(), 
+          phase: nextPhase, 
           round: payload.round || state.round,
           timeRemaining: payload.duration || 0,
           voteCounts: {}, // reset votes on phase change
           votesCast: 0,
+          myVoteTargetId: null,
+          actionConfirmedMessage: null,
           dawnEvents: isDawn ? state.dawnEvents : [],
           lastProtectedTargetId: isDawn ? state.currentNightTargetId : state.lastProtectedTargetId,
-          currentNightTargetId: isDawn ? null : state.currentNightTargetId
+          currentNightTargetId: isNight ? state.currentNightTargetId : null
+        };
+      case 'action_confirmed':
+        return {
+          actionConfirmedMessage: payload.message || 'Action confirmed.',
         };
       case 'role_assigned':
         return { 
@@ -211,5 +227,7 @@ export const useGameStore = create<GameState>((set) => ({
     myArrows: null,
     lastProtectedTargetId: null,
     currentNightTargetId: null,
+    myVoteTargetId: null,
+    actionConfirmedMessage: null,
   })
 }));

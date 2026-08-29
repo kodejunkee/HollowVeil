@@ -6,69 +6,79 @@ export function PlayerList() {
   const { 
     players, phase, voteCounts, myUserId, isAlive, currentNightTargetId,
     myRole, covenMateIds, nonRevivableIds, hasRevived, myArrows, round, 
-    lastProtectedTargetId, hasFinalWhisper
+    lastProtectedTargetId, hasFinalWhisper, myVoteTargetId, actionConfirmedMessage,
+    setCurrentNightTargetId, setMyVoteTargetId
   } = useGameStore();
 
   const handlePlayerAction = (targetId: string) => {
     if (phase === 'VOTING') {
       wsClient.send('vote_cast', { target_id: targetId });
+      setMyVoteTargetId(targetId);
       if (!isAlive && myRole === 'NECROMANCER') {
         useGameStore.setState({ hasFinalWhisper: false });
       }
     } else if (phase === 'NIGHT') {
       wsClient.send('action_submit', { action: 'use_ability', target_id: targetId });
+      setCurrentNightTargetId(targetId);
       if (myRole === 'NECROMANCER') useGameStore.setState({ hasRevived: true });
       if (myRole === 'HUNTER') useGameStore.setState((state) => ({ myArrows: (state.myArrows || 0) - 1 }));
-      if (myRole === 'WARDEN') useGameStore.setState({ currentNightTargetId: targetId });
     }
   };
 
-  const getActionForPlayer = (p: any): { label: string; disabled: boolean } | null => {
+  const getActionForPlayer = (p: any): { label: string; disabled: boolean; variant?: 'default' | 'outline' | 'ghost' | 'secondary' } | null => {
     if (phase === 'VOTING') {
       if (!isAlive) {
         if (myRole === 'NECROMANCER' && hasFinalWhisper && p.is_alive) {
-          return { label: 'Final Whisper', disabled: false };
+          const isVoted = myVoteTargetId === p.user_id;
+          return { label: isVoted ? 'Whispered ✓' : 'Final Whisper', disabled: isVoted, variant: isVoted ? 'default' : 'outline' };
         }
         return null;
       }
       if (!p.is_alive) return null; // Can't vote for dead
       if (p.user_id === myUserId && myRole !== 'JESTER') return null; // Can't vote for self unless Jester
-      return { label: 'Vote', disabled: false };
+      
+      const isVoted = myVoteTargetId === p.user_id;
+      return { 
+        label: isVoted ? 'Voted ✓' : 'Vote', 
+        disabled: isVoted, 
+        variant: isVoted ? 'default' : 'outline' 
+      };
     }
     
     if (phase === 'NIGHT') {
       if (!isAlive) return null;
+      const isTargeted = currentNightTargetId === p.user_id;
       
       switch (myRole) {
         case 'SEER':
           if (!p.is_alive || p.user_id === myUserId) return null;
-          return { label: 'Scry', disabled: false };
+          return { label: isTargeted ? 'Scrying ✓' : 'Scry', disabled: false, variant: isTargeted ? 'default' : 'outline' };
           
         case 'VAMPIRE':
           if (!p.is_alive || p.user_id === myUserId) return null;
           if (covenMateIds.includes(p.user_id)) return null; // Can't bite coven
-          return { label: 'Bite', disabled: false };
+          return { label: isTargeted ? 'Biting ✓' : 'Bite', disabled: false, variant: isTargeted ? 'default' : 'outline' };
           
         case 'WEREWOLF':
           if (!p.is_alive || p.user_id === myUserId) return null;
-          return { label: 'Maul', disabled: false };
+          return { label: isTargeted ? 'Mauling ✓' : 'Maul', disabled: false, variant: isTargeted ? 'default' : 'outline' };
           
         case 'HUNTER':
           if (!p.is_alive || p.user_id === myUserId) return null;
           if (round <= 1) return null;
           if (myArrows !== null && myArrows <= 0) return null;
-          return { label: 'Shoot', disabled: false };
+          return { label: isTargeted ? 'Shooting ✓' : 'Shoot', disabled: false, variant: isTargeted ? 'default' : 'outline' };
           
         case 'WARDEN':
           if (!p.is_alive) return null;
-          if (p.user_id === lastProtectedTargetId) return { label: 'Protect', disabled: true };
-          return { label: 'Protect', disabled: false };
+          if (p.user_id === lastProtectedTargetId) return { label: 'Protect (Cooldown)', disabled: true, variant: 'ghost' };
+          return { label: isTargeted ? 'Protecting ✓' : 'Protect', disabled: false, variant: isTargeted ? 'default' : 'outline' };
           
         case 'NECROMANCER':
           if (p.is_alive) return null;
           if (hasRevived) return null;
           if (nonRevivableIds.includes(p.user_id)) return null;
-          return { label: 'Revive', disabled: false };
+          return { label: isTargeted ? 'Reviving ✓' : 'Revive', disabled: false, variant: isTargeted ? 'default' : 'outline' };
           
         default:
           return null; // Villager, Cursed Villager, Jester
@@ -79,9 +89,12 @@ export function PlayerList() {
   };
 
   const canVote = isAlive || (myRole === 'NECROMANCER' && hasFinalWhisper);
+  const skipVotes = voteCounts['skip'] || 0;
+  const isSkipVoted = myVoteTargetId === 'skip';
 
   const getBannerMessage = () => {
     if (phase === 'NIGHT') {
+      if (actionConfirmedMessage) return `✨ ${actionConfirmedMessage}`;
       if (!isAlive) return "💀 You are deceased. Watching the shadows from beyond...";
       switch (myRole) {
         case 'VILLAGER':
@@ -101,11 +114,13 @@ export function PlayerList() {
         case 'WARDEN': return "🛡️ Select a target to protect:";
       }
     } else if (phase === 'VOTING') {
+      if (isSkipVoted) return "✨ You chose to abstain / skip voting.";
+      if (myVoteTargetId) return "✨ Your vote has been cast. Waiting for the verdict...";
       if (!isAlive) {
         if (myRole === 'NECROMANCER' && hasFinalWhisper) return "👻 Final Whisper — your last vote from beyond the grave.";
         return "💀 You are deceased and cannot participate in voting.";
       }
-      return "Town Judgment: Cast your vote.";
+      return "Town Judgment: Cast your vote or choose to skip.";
     }
     return null;
   };
@@ -123,6 +138,7 @@ export function PlayerList() {
       {players.map((p) => {
         const isMe = p.user_id === myUserId;
         const isTargeted = currentNightTargetId === p.user_id;
+        const isVoted = myVoteTargetId === p.user_id;
         const votes = voteCounts[p.user_id] || 0;
         const action = getActionForPlayer(p);
 
@@ -131,7 +147,7 @@ export function PlayerList() {
             key={p.user_id} 
             className={`flex items-center justify-between p-3 rounded-lg border transition-colors
               ${!p.is_alive ? 'opacity-50 bg-destructive/10 border-destructive/20' : 'bg-card'}
-              ${isTargeted ? 'border-primary ring-1 ring-primary' : ''}
+              ${isTargeted || isVoted ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}
               ${covenMateIds.includes(p.user_id) && myRole === 'VAMPIRE' ? 'border-red-900/50 bg-red-950/10' : ''}
             `}
           >
@@ -143,22 +159,25 @@ export function PlayerList() {
                   {!p.is_alive && <span className="text-destructive text-xs ml-2">(Ghost)</span>}
                 </span>
                 {covenMateIds.includes(p.user_id) && myRole === 'VAMPIRE' && (
-                  <span className="text-red-500 text-xs">Coven Mate</span>
+                  <span className="text-red-500 text-xs font-semibold">Coven Mate</span>
+                )}
+                {isTargeted && phase === 'NIGHT' && (
+                  <span className="text-primary text-xs font-semibold">Night Target</span>
                 )}
               </div>
             </div>
 
             <div className="flex items-center gap-4">
               {phase === 'VOTING' && p.is_alive && (
-                <span className="text-sm font-bold w-6 text-center bg-secondary rounded-md py-1">
-                  {votes > 0 ? votes : '-'}
+                <span className={`text-sm font-bold min-w-6 px-2 text-center rounded-md py-1 ${votes > 0 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
+                  {votes > 0 ? `${votes} vote${votes > 1 ? 's' : ''}` : '-'}
                 </span>
               )}
               
               {action && (
                 <Button 
                   size="sm" 
-                  variant={action.disabled ? "ghost" : "outline"}
+                  variant={action.variant || (action.disabled ? "ghost" : "outline")}
                   disabled={action.disabled}
                   onClick={() => handlePlayerAction(p.user_id)}
                 >
@@ -173,11 +192,12 @@ export function PlayerList() {
       {phase === 'VOTING' && canVote && (
         <div className="mt-4 pt-4 border-t border-border">
           <Button 
-            variant="secondary" 
+            variant={isSkipVoted ? "default" : "secondary"} 
             className="w-full"
+            disabled={isSkipVoted}
             onClick={() => handlePlayerAction('skip')}
           >
-            Skip Vote
+            {isSkipVoted ? 'Skipped ✓' : `Skip Vote ${skipVotes > 0 ? `(${skipVotes})` : ''}`}
           </Button>
         </div>
       )}
