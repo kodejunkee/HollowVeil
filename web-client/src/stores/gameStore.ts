@@ -175,6 +175,8 @@ export const useGameStore = create<GameState>((set) => ({
         };
       case 'vote_update':
         return { voteCounts: payload.counts, votesCast: payload.votes_cast };
+      case 'vote_result':
+        return { executionData: payload };
       case 'execution_result':
         return {
           timelineEvents: [...state.timelineEvents, { ...payload, phase: 'EXECUTION', time: new Date().toISOString() }],
