@@ -74,11 +74,12 @@ def _validate_village(
     if not sender.is_alive:
         return {"valid": False, "error": "Dead players cannot write in village chat."}
 
-    # Only allow messages during Discussion, Voting, or Execution phases
+    # Only allow messages during Discussion, Voting, Execution, or Lobby phases
     if room.phase not in (
         GamePhase.DISCUSSION,
         GamePhase.VOTING,
         GamePhase.EXECUTION,
+        GamePhase.LOBBY,
     ):
         return {"valid": False, "error": "Village chat is not active during this phase."}
 
