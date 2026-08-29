@@ -13,11 +13,12 @@ export default function Lobby() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const { session, user } = useAuthStore();
-  const { players, isHost, roomCode, wsStatus, setRoom, lobbyCountdown } = useGameStore();
+  const { players, isHost, roomCode, wsStatus, setRoom, lobbyCountdown, setUserId } = useGameStore();
 
   useEffect(() => {
-    if (!roomId || !session?.access_token) return;
+    if (!roomId || !session?.access_token || !user?.id) return;
     
+    setUserId(user.id);
     const serverUrl = import.meta.env.VITE_API_URL || 'https://hollowveil-api.onrender.com';
     setRoom(roomId, null);
     
@@ -33,17 +34,18 @@ export default function Lobby() {
     return () => {
       wsClient.disconnect();
     };
-  }, [roomId, session]);
+  }, [roomId, session?.access_token, user?.id]);
 
   const handleStartGame = () => {
     wsClient.send('lobby_start');
   };
 
+  const me = players.find(p => p.user_id === user?.id);
+  const isReady = me?.is_ready || false;
+  const readyCount = players.filter(p => p.is_ready).length;
+
   const handleToggleReady = () => {
-    const me = players.find(p => p.user_id === user?.id);
-    if (me) {
-      wsClient.send('lobby_ready', { is_ready: !me.is_ready });
-    }
+    wsClient.send('lobby_ready', { is_ready: !isReady });
   };
 
   const handleLeave = () => {
@@ -51,10 +53,6 @@ export default function Lobby() {
     useGameStore.setState({ phase: 'LOBBY' });
     navigate('/');
   };
-
-  const me = players.find(p => p.user_id === user?.id);
-  const isReady = me?.is_ready || false;
-  const readyCount = players.filter(p => p.is_ready).length;
 
   return (
     <div className="flex flex-col min-h-screen p-4 max-w-5xl mx-auto w-full">

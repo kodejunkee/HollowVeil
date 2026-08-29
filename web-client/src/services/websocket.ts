@@ -12,10 +12,13 @@ export class GameWebSocket {
   public onConnect: (() => void) | null = null;
   public onDisconnect: (() => void) | null = null;
 
+  private pingInterval: any = null;
+
   connect(serverUrl: string, roomId: string, authToken: string) {
     this.url = serverUrl;
     this.roomId = roomId;
     this.token = authToken;
+    this.maxReconnectAttempts = 5; // Reset on intentional connect
 
     const baseWsUrl = serverUrl.replace(/^http/, 'ws');
     const wsUrl = `${baseWsUrl}/ws/${roomId}?token=${authToken}`;
@@ -26,11 +29,17 @@ export class GameWebSocket {
       this.reconnectAttempts = 0;
       useGameStore.getState().setWsStatus('connected');
       if (this.onConnect) this.onConnect();
+      
+      // Start heartbeat
+      this.pingInterval = setInterval(() => {
+        this.send('ping');
+      }, 30000);
     };
 
     this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (data.type === 'pong') return; // Ignore pong responses
         if (this.onMessage) this.onMessage(data);
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e);
@@ -39,6 +48,7 @@ export class GameWebSocket {
 
     this.ws.onclose = () => {
       console.log('WebSocket disconnected');
+      if (this.pingInterval) clearInterval(this.pingInterval);
       if (this.onDisconnect) this.onDisconnect();
       this.attemptReconnect();
     };
@@ -58,6 +68,7 @@ export class GameWebSocket {
 
   disconnect() {
     this.maxReconnectAttempts = 0; // Prevent auto-reconnect
+    if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.ws) {
       this.ws.close();
       this.ws = null;

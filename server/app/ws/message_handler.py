@@ -61,6 +61,8 @@ class MessageHandler:
                 await self._vote_cast(room, user_id, data)
             elif msg_type == "debug_force_role":
                 await self._debug_force_role(room, user_id, data)
+            elif msg_type == "ping":
+                pass
             else:
                 await self.mgr.send_personal(room.room_id, user_id, {
                     "type": "error",
