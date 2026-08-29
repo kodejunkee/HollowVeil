@@ -1,12 +1,8 @@
-import { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { useGameStore } from '../stores/gameStore';
 import { ChatPanel } from '../components/game/ChatPanel';
 import { PlayerList } from '../components/game/PlayerList';
 
 export default function Game() {
-  const { roomId } = useParams();
-  const navigate = useNavigate();
   const { phase, round, timeRemaining, isAlive, myRoleName } = useGameStore();
 
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useGameStore } from '../stores/gameStore';
 import { wsClient } from '../services/websocket';
@@ -8,7 +8,6 @@ import Game from './Game';
 
 export default function Room() {
   const { roomId } = useParams();
-  const navigate = useNavigate();
   const { session, user } = useAuthStore();
   const { phase, setRoom, setUserId } = useGameStore();
 

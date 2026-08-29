@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useGameStore } from '../stores/gameStore';
 import { wsClient } from '../services/websocket';
@@ -10,10 +9,9 @@ import { Users, Play, LogOut, Check, X } from 'lucide-react';
 import { ChatPanel } from '../components/game/ChatPanel';
 
 export default function Lobby() {
-  const { roomId } = useParams();
   const navigate = useNavigate();
-  const { session, user } = useAuthStore();
-  const { players, isHost, roomCode, wsStatus, setRoom, lobbyCountdown, setUserId } = useGameStore();
+  const { user } = useAuthStore();
+  const { players, isHost, roomCode, wsStatus, lobbyCountdown } = useGameStore();
 
   const handleStartGame = () => {
     wsClient.send('lobby_start');
