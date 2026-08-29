@@ -178,6 +178,9 @@ export const useGameStore = create<GameState>((set) => ({
         return { gameOverData: payload, phase: 'VICTORY' };
       case 'non_revivable_ids':
         return { nonRevivableIds: payload.ids || [] };
+      case 'error':
+        alert(payload.message || 'An error occurred');
+        return state;
       default:
         return state;
     }

@@ -182,6 +182,12 @@ class MessageHandler:
                 await self._start_game(room)
             except asyncio.CancelledError:
                 pass
+            except Exception as e:
+                logger.exception("Error in countdown or _start_game")
+                await self.mgr.broadcast(room.room_id, {
+                    "type": "error",
+                    "message": f"Failed to start game: {str(e)}",
+                })
 
         room._lobby_countdown_task = asyncio.create_task(countdown())
 
@@ -193,6 +199,19 @@ class MessageHandler:
 
         if room.phase == GamePhase.LOBBY:
             room.remove_player(user_id)
+            
+            # Cancel countdown if it's running
+            if hasattr(room, "_lobby_countdown_task") and room._lobby_countdown_task:
+                room._lobby_countdown_task.cancel()
+                room._lobby_countdown_task = None
+                await self.mgr.broadcast(room.room_id, {
+                    "type": "lobby_countdown_stopped",
+                })
+                await self.mgr.broadcast(room.room_id, {
+                    "type": "error",
+                    "message": "Countdown stopped because a player disconnected.",
+                })
+
             await self.mgr.broadcast(room.room_id, {
                 "type": "lobby_update",
                 **room.lobby_state(),
