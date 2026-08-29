@@ -41,14 +41,15 @@ class ConnectionManager:
             self._rooms[room_id][user_id] = websocket
         logger.info("WS connected: room=%s user=%s", room_id, user_id)
 
-    async def disconnect(self, room_id: str, user_id: str) -> None:
-        """Remove a connection (idempotent)."""
+    async def disconnect(self, room_id: str, user_id: str, websocket: WebSocket = None) -> None:
+        """Remove a connection (idempotent). If websocket is provided, only remove if it matches."""
         async with self._lock:
             room_conns = self._rooms.get(room_id)
             if room_conns:
-                room_conns.pop(user_id, None)
-                if not room_conns:
-                    del self._rooms[room_id]
+                if websocket is None or room_conns.get(user_id) is websocket:
+                    room_conns.pop(user_id, None)
+                    if not room_conns:
+                        del self._rooms[room_id]
         logger.info("WS disconnected: room=%s user=%s", room_id, user_id)
 
     def get_connection(self, room_id: str, user_id: str) -> WebSocket | None:
@@ -74,7 +75,7 @@ class ConnectionManager:
                 await ws.send_json(data)
             except Exception:
                 logger.warning("Failed to send to user=%s room=%s", user_id, room_id)
-                await self.disconnect(room_id, user_id)
+                await self.disconnect(room_id, user_id, ws)
 
     async def send_to_many(
         self,

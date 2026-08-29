@@ -91,14 +91,18 @@ async def websocket_endpoint(
             data = await websocket.receive_json()
             await handler.handle(room, user.user_id, user.display_name, data)
     except WebSocketDisconnect:
-        await manager.disconnect(room_id, user.user_id)
-        logger.info("User %s disconnected from room %s", user.user_id, room_id)
-        try:
-            await handler.handle(room, user.user_id, user.display_name, {
-                "type": "player_disconnect",
-            })
-        except Exception:
-            logger.exception("Error during disconnect handling for %s", user.user_id)
+        is_current = manager.get_connection(room_id, user.user_id) is websocket
+        await manager.disconnect(room_id, user.user_id, websocket)
+        if is_current:
+            logger.info("User %s disconnected from room %s", user.user_id, room_id)
+            try:
+                await handler.handle(room, user.user_id, user.display_name, {
+                    "type": "player_disconnect",
+                })
+            except Exception:
+                logger.exception("Error during disconnect handling for %s", user.user_id)
+        else:
+            logger.info("Stale connection dropped for user %s in room %s (ignored)", user.user_id, room_id)
 
 # ── REST Endpoints ───────────────────────────────────────────────────────────
 
